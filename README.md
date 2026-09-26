@@ -174,7 +174,11 @@ difference crosses a threshold you wrote down.
 - **Read-only, always.** The only MongoDB operations it issues are `find`,
   `$sample`, `countDocuments` and `estimatedDocumentCount`.
 - **Works with no database at all.** `--input-json` reads a JSON array or NDJSON
-  file, so you can try it, test it, and run it in CI without a `mongod`.
+  file, so you can try it, test it, and run it in CI without a `mongod`. NDJSON
+  is *streamed*: with `-n 1000` docpulse reads a thousand lines of your 40 GB
+  export and stops, at constant memory. A `[ … ]` array is a single JSON value
+  that has to be held in memory in one piece, so that form is capped at 128 MB
+  and the error tells you to convert the file to NDJSON.
 - **Three runtime dependencies**: `commander`, `zod`, `mongodb`.
 
 ## Commands

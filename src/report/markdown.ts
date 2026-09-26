@@ -22,6 +22,19 @@ function fenced(text: string): string {
   return text.split('\n').map(sanitize).join('\n');
 }
 
+/**
+ * Sanitising for text rendered as Markdown *prose* rather than inside a code
+ * span — currently only the warning blockquote, which interpolates a snapshot
+ * file's `sampling.filter`. There the usual backtick/newline escaping is not
+ * enough: `[a](http://evil)`, `**bold**` and raw `<html>` would all render. The
+ * punctuation escaped below is the set that can start an inline construct;
+ * CommonMark lets any ASCII punctuation be backslash-escaped, and docpulse's
+ * own warning wording contains none of it, so the result stays readable.
+ */
+function prose(text: string): string {
+  return sanitize(text).replace(/[\\`*_[\]<>&~|]/g, (m) => `\\${m}`);
+}
+
 function sanitize(text: string): string {
   let out = '';
   for (const char of text) {
@@ -95,7 +108,7 @@ export function renderMarkdown(result: DiffResult): string {
   if (result.warnings.length > 0) {
     lines.push('');
     for (const warning of result.warnings) {
-      lines.push(`> **Warning:** ${cell(warning)}`);
+      lines.push(`> **Warning:** ${prose(warning)}`);
       lines.push('>');
     }
     lines.pop();

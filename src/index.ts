@@ -47,6 +47,8 @@ export {
 } from './config.js';
 export {
   ArrayDocumentSource,
+  MAX_BUFFERED_INPUT_BYTES,
+  NdjsonDocumentSource,
   createFileSource,
   parseDocumentsText,
 } from './source/arraySource.js';
