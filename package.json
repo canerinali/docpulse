@@ -1,0 +1,66 @@
+{
+  "name": "docpulse",
+  "version": "0.1.0",
+  "description": "Data-contract testing for schemaless MongoDB collections: snapshot a collection's observed field schema and fail CI when it drifts past your thresholds.",
+  "keywords": [
+    "mongodb",
+    "schema",
+    "drift",
+    "data-contract",
+    "ci",
+    "snapshot",
+    "data-quality",
+    "schema-drift",
+    "cli"
+  ],
+  "license": "Apache-2.0",
+  "author": "Caner İnali",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/canerinali/docpulse.git"
+  },
+  "homepage": "https://github.com/canerinali/docpulse#readme",
+  "bugs": {
+    "url": "https://github.com/canerinali/docpulse/issues"
+  },
+  "type": "module",
+  "bin": {
+    "docpulse": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "examples",
+    "docpulse.config.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "check": "tsc --noEmit -p tsconfig.json && vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "mongodb": "^7.6.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
+  }
+}
