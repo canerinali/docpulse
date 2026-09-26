@@ -130,6 +130,48 @@ describe('markdown reporter', () => {
     expect(warning).not.toContain('**bold**');
   });
 
+  it('renders the mismatched filters inside a code span, not as prose', () => {
+    // A filter key cannot be a live link twice over: the JSON is inside a code
+    // span, and the punctuation that starts an inline construct is escaped
+    // inside it as well.
+    const filter = { 'a]': '[click](https://evil.example)' };
+    const a = snap({
+      fields: [docField('f', { units: 1000, present: 1000, types: { int: 1000 } })],
+      sampling: { filter },
+    });
+    const b = snap({ fields: a.fields, sampling: { filter: {} } });
+    const md = renderMarkdown(diffSnapshots(a, b, DEFAULT_CONFIG, { allowFilterMismatch: true }));
+    const warning = md.split('\n').find((l) => l.startsWith('> **Warning:**')) as string;
+
+    // Two code spans (one filter each), so an even number of backticks and no
+    // stray one that could swallow the rest of the report.
+    const spans = warning.match(/`[^`]*`/g) ?? [];
+    expect(spans).toHaveLength(2);
+    expect((warning.match(/`/g) ?? []).length).toBe(4);
+    expect(spans[0]).toContain('click');
+    expect(warning).toContain('filter=`');
+
+    // Everything hostile is inside a span, and escaped inside it too.
+    expect(warning).not.toMatch(/\[click\]\(https:\/\/evil\.example\)/);
+    expect(warning).toContain('\\[click\\]');
+
+    // The backtick a filter key could carry cannot close the span docpulse
+    // opened: it is escaped to its printable form first.
+    const hostile = { 'x`y': 1 };
+    const c = snap({
+      fields: [docField('f', { units: 1000, present: 1000, types: { int: 1000 } })],
+      sampling: { filter: hostile },
+    });
+    const backticked = renderMarkdown(
+      diffSnapshots(c, b, DEFAULT_CONFIG, { allowFilterMismatch: true }),
+    )
+      .split('\n')
+      .find((l) => l.startsWith('> **Warning:**')) as string;
+    expect(backticked).toMatch(/x\\+u0060y/);
+    expect((backticked.match(/`/g) ?? []).length).toBe(4);
+    expect((backticked.match(/`[^`]*`/g) ?? [])).toHaveLength(2);
+  });
+
   it('escapes a pipe inside a path so the table survives', () => {
     const a = snap({ fields: [docField('we|ird', { units: 1000, present: 900, types: { string: 900 } })] });
     const b = snap({ fields: [docField('we|ird', { units: 1000, present: 100, types: { string: 100 } })] });

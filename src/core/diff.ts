@@ -153,6 +153,18 @@ function suggestedAction(type: FindingType, from: Set<string>, to: Set<string>):
  * Refusals (collection, formatVersion, sampling) short-circuit: the result then
  * carries a `refusal` and no findings at all.
  */
+/**
+ * Wrap untrusted JSON in a Markdown code span.
+ *
+ * A code span cannot contain a backtick, so a backtick in the text becomes the
+ * printable `\u0060` first — the same escape the reporters use. Without that, a
+ * filter key carrying a backtick would close the span docpulse opened and the
+ * rest of the line would be prose again.
+ */
+function codeSpan(json: string): string {
+  return `\`${json.replace(/`/g, '\\u0060')}\``;
+}
+
 export function diffSnapshots(
   baseline: Snapshot,
   current: Snapshot,
@@ -219,9 +231,16 @@ export function diffSnapshots(
         },
       };
     }
+    // On the refusal path above, `detail` is printed inside a fenced block and
+    // cannot render as Markdown. This warning is prose, so the filter JSON —
+    // which comes out of a snapshot *file*, and a pull request can change a
+    // snapshot file — is wrapped in a code span: a `[link](…)` or `**bold**`
+    // in a filter key has to be shown, not rendered.
     warnings.push(
       `sampling differs between the two snapshots and --allow-filter-mismatch was given; ` +
-        `presence changes below may be an artefact of the query, not drift. ${detail.replace(/\n/g, ' | ')}`,
+        `presence changes below may be an artefact of the query, not drift. ` +
+        `baseline: mode=${baseline.sampling.mode} filter=${codeSpan(filterA)} | ` +
+        `current: mode=${current.sampling.mode} filter=${codeSpan(filterB)}`,
     );
   }
 
