@@ -1,6 +1,13 @@
 # docpulse
 
-<!-- badges -->
+[![ci](https://github.com/canerinali/docpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/canerinali/docpulse/actions/workflows/ci.yml)
+[![licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue.svg)](LICENSE)
+[![node: >=22](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org/)
+<!-- npm badge goes here once `npm publish` has run:
+[![npm](https://img.shields.io/npm/v/docpulse.svg)](https://www.npmjs.com/package/docpulse)
+-->
+
+<https://github.com/canerinali/docpulse>
 
 **Data contract testing for schemaless MongoDB collections.**
 
