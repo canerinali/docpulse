@@ -1,0 +1,33 @@
+[
+  {
+    "_id": 1,
+    "customer": { "taxId": "TR123" },
+    "lines": [
+      { "sku": "A", "qty": 2 },
+      { "sku": "B", "qty": 1 }
+    ],
+    "note": "hello"
+  },
+  {
+    "_id": 2,
+    "customer": { "taxId": null },
+    "lines": [{ "sku": "C", "qty": 3 }],
+    "note": ""
+  },
+  {
+    "_id": 3,
+    "customer": {},
+    "lines": [],
+    "note": "x"
+  },
+  {
+    "_id": 4,
+    "customer": { "taxId": "TR999" },
+    "lines": [
+      { "sku": "D" },
+      { "sku": "E", "qty": "7" },
+      { "sku": "F", "qty": 1 },
+      { "qty": 2 }
+    ]
+  }
+]
