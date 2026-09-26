@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { SnapshotAccumulator, inferFromDocuments, inferFromSource } from '../src/core/infer.js';
 import { ArrayDocumentSource, parseDocumentsText } from '../src/source/arraySource.js';
+import { logicalCollectionName } from '../src/commands/snapshot.js';
 import type { FieldStat, SamplingInfo, Snapshot } from '../src/core/types.js';
 
 const DOCS = JSON.parse(
@@ -211,5 +212,17 @@ describe('document parsing', () => {
 
   it('rejects scalars and arrays as documents', () => {
     expect(() => parseDocumentsText('[1,2]', 'x')).toThrow(/element 0 is not a JSON object/);
+  });
+});
+
+describe('logicalCollectionName', () => {
+  it('joins a db and collection, or uses the collection alone', () => {
+    expect(logicalCollectionName('shop', 'orders')).toBe('shop.orders');
+    expect(logicalCollectionName(undefined, 'orders')).toBe('orders');
+    expect(logicalCollectionName(undefined, undefined)).toBeUndefined();
+  });
+
+  it('rejects a database name with no collection', () => {
+    expect(() => logicalCollectionName('shop', undefined)).toThrow(/--db needs --collection/);
   });
 });

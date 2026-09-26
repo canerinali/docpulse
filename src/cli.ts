@@ -2,6 +2,7 @@
 import { pathToFileURL } from 'node:url';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import { DocpulseError } from './errors.js';
+import { runDiff, type DiffOptions } from './commands/diff.js';
 import { runSnapshot, type SnapshotOptions } from './commands/snapshot.js';
 import { VERSION } from './version.js';
 
@@ -13,7 +14,12 @@ function parsePositiveInt(raw: string): number {
   return n;
 }
 
-export function buildProgram(): Command {
+/** Mutable holder so a subcommand action can hand its exit code back to main(). */
+export interface CliState {
+  exitCode: number;
+}
+
+export function buildProgram(state: CliState = { exitCode: 0 }): Command {
   const program = new Command();
 
   program
@@ -70,15 +76,42 @@ export function buildProgram(): Command {
       await runSnapshot(options);
     });
 
+  program
+    .command('diff')
+    .configureHelp({ helpWidth: 96 })
+    .description('Compare two snapshots and report only drifts that cross configured thresholds.')
+    .argument('<baseline.json>', 'Snapshot you consider correct')
+    .argument('<current.json>', 'Snapshot taken now')
+    .option('--config <file>', 'Config file (default: ./docpulse.config.json if present)')
+    .addOption(
+      new Option('--format <fmt>', 'markdown | json | table').default('markdown', 'markdown'),
+    )
+    .option('-o, --out <file>', 'Write report here (default: stdout)')
+    .option('--fail-on-drift', 'Exit 1 if any finding survives the thresholds')
+    .option(
+      '--allow-filter-mismatch',
+      'Downgrade a filter/sampling mismatch from refusal to a warning',
+    )
+    .addHelpText(
+      'after',
+      '\nExit codes: 0 = no drift (or drift without --fail-on-drift) | 1 = drift + --fail-on-drift\n' +
+        '            2 = usage error, invalid/unreadable snapshot, or refused comparison',
+    )
+    .action(async (baselinePath: string, currentPath: string, options: DiffOptions) => {
+      const outcome = await runDiff(baselinePath, currentPath, options);
+      state.exitCode = outcome.exitCode;
+    });
+
   return program;
 }
 
 export async function main(argv: string[] = process.argv): Promise<number> {
-  const program = buildProgram();
+  const state: CliState = { exitCode: 0 };
+  const program = buildProgram(state);
   program.exitOverride();
   try {
     await program.parseAsync(argv);
-    return 0;
+    return state.exitCode;
   } catch (error) {
     if (error instanceof DocpulseError) {
       process.stderr.write(`docpulse: ${error.message}\n`);

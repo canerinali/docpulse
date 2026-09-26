@@ -1,0 +1,179 @@
+{
+  "formatVersion": 1,
+  "tool": "docpulse@0.1.0",
+  "label": "prod-2026-09-19",
+  "createdAt": "2026-09-19T02:15:04.881Z",
+  "collection": "shop.orders",
+  "sampling": {
+    "mode": "sort-limit",
+    "sampleSize": 1000,
+    "filter": {},
+    "sort": {
+      "_id": -1
+    }
+  },
+  "sampledDocs": 1000,
+  "estimatedTotalDocs": 482913,
+  "estimatedTotalDocsMethod": "estimatedDocumentCount",
+  "fields": [
+    {
+      "path": "_id",
+      "denominator": "documents",
+      "observedUnits": 1000,
+      "presentCount": 1000,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "objectId": 1000
+      }
+    },
+    {
+      "path": "customer",
+      "denominator": "documents",
+      "observedUnits": 1000,
+      "presentCount": 1000,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "object": 1000
+      }
+    },
+    {
+      "path": "customer.taxId",
+      "denominator": "documents",
+      "observedUnits": 1000,
+      "presentCount": 412,
+      "nullCount": 17,
+      "emptyStringCount": 3,
+      "bsonTypes": {
+        "null": 17,
+        "string": 395
+      }
+    },
+    {
+      "path": "legacyCouponCode",
+      "denominator": "documents",
+      "observedUnits": 1000,
+      "presentCount": 640,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "string": 640
+      }
+    },
+    {
+      "path": "lines",
+      "denominator": "documents",
+      "observedUnits": 1000,
+      "presentCount": 1000,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "array": 1000
+      }
+    },
+    {
+      "path": "lines.items[]",
+      "denominator": "arrayElements",
+      "arrayParent": "lines",
+      "observedUnits": 4102,
+      "presentCount": 4102,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "object": 4102
+      }
+    },
+    {
+      "path": "lines.items[].qty",
+      "denominator": "arrayElements",
+      "arrayParent": "lines",
+      "observedUnits": 4102,
+      "presentCount": 4102,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "int": 4102
+      }
+    },
+    {
+      "path": "lines.items[].sku",
+      "denominator": "arrayElements",
+      "arrayParent": "lines",
+      "observedUnits": 4102,
+      "presentCount": 4098,
+      "nullCount": 0,
+      "emptyStringCount": 12,
+      "bsonTypes": {
+        "string": 4098
+      }
+    },
+    {
+      "path": "notes",
+      "denominator": "documents",
+      "observedUnits": 1000,
+      "presentCount": 300,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "string": 300
+      }
+    },
+    {
+      "path": "payment",
+      "denominator": "documents",
+      "observedUnits": 1000,
+      "presentCount": 1000,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "object": 1000
+      }
+    },
+    {
+      "path": "payment.provider",
+      "denominator": "documents",
+      "observedUnits": 1000,
+      "presentCount": 1000,
+      "nullCount": 21,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "null": 21,
+        "string": 979
+      }
+    },
+    {
+      "path": "status",
+      "denominator": "documents",
+      "observedUnits": 1000,
+      "presentCount": 1000,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "string": 1000
+      }
+    },
+    {
+      "path": "total",
+      "denominator": "documents",
+      "observedUnits": 1000,
+      "presentCount": 1000,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "int": 1000
+      }
+    },
+    {
+      "path": "updatedAt",
+      "denominator": "documents",
+      "observedUnits": 1000,
+      "presentCount": 1000,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "date": 1000
+      }
+    }
+  ]
+}

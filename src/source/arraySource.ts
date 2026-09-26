@@ -116,10 +116,18 @@ export function parseDocumentsText(
   return docs;
 }
 
-/** Build a {@link DocumentSource} from a JSON-array or NDJSON file on disk. */
+/**
+ * Build a {@link DocumentSource} from a JSON-array or NDJSON file on disk.
+ *
+ * `collection` names the logical collection the documents belong to. Two
+ * snapshots can only be diffed when their `collection` matches, so pass the
+ * same name (via `-d`/`-c`) for the two files you intend to compare; it
+ * defaults to `input:<basename>`, which is right for a one-off look.
+ */
 export async function createFileSource(
   file: string,
   sampleSize: number,
+  collection?: string,
 ): Promise<ArrayDocumentSource> {
   let text: string;
   try {
@@ -132,7 +140,7 @@ export async function createFileSource(
   }
   const docs = parseDocumentsText(text, file);
   return new ArrayDocumentSource(docs, {
-    collection: `input:${basename(file)}`,
+    collection: collection ?? `input:${basename(file)}`,
     sampleSize,
   });
 }

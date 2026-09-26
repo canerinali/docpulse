@@ -18,6 +18,20 @@ export interface SnapshotOptions {
   label?: string | undefined;
 }
 
+/** `-d shop -c orders` -> `shop.orders`; `-c orders` -> `orders`; neither -> undefined. */
+export function logicalCollectionName(
+  db: string | undefined,
+  collection: string | undefined,
+): string | undefined {
+  if (collection === undefined || collection === '') {
+    if (db !== undefined && db !== '') {
+      throw new UsageError('--db needs --collection: a database name alone does not identify a collection');
+    }
+    return undefined;
+  }
+  return db !== undefined && db !== '' ? `${db}.${collection}` : collection;
+}
+
 /** Parse a `--filter` / `--sort` flag into a plain JSON object. */
 export function parseJsonObjectFlag(raw: string, flag: string): Record<string, unknown> {
   let parsed: unknown;
@@ -60,14 +74,8 @@ export function parseSamplingFlags(options: SnapshotOptions): {
 /** Build the right {@link DocumentSource} for the given flags. */
 export async function createSource(options: SnapshotOptions): Promise<DocumentSource> {
   if (options.inputJson !== undefined) {
-    for (const [flag, value] of [
-      ['--uri', options.uri],
-      ['--db', options.db],
-      ['--collection', options.collection],
-    ] as const) {
-      if (value !== undefined) {
-        throw new UsageError(`${flag} cannot be combined with --input-json`);
-      }
+    if (options.uri !== undefined) {
+      throw new UsageError('--uri cannot be combined with --input-json');
     }
     if (options.random === true) {
       throw new UsageError('--random applies to MongoDB sampling only, not --input-json');
@@ -75,7 +83,14 @@ export async function createSource(options: SnapshotOptions): Promise<DocumentSo
     if (options.filter !== '{}') {
       throw new UsageError('--filter applies to MongoDB sampling only, not --input-json');
     }
-    return createFileSource(options.inputJson, options.sampleSize);
+    // -d/-c are optional here, and name the *logical* collection the documents
+    // belong to. `diff` refuses to compare snapshots of different collections,
+    // so two files that represent the same collection must say so.
+    return createFileSource(
+      options.inputJson,
+      options.sampleSize,
+      logicalCollectionName(options.db, options.collection),
+    );
   }
 
   const uri = options.uri ?? process.env.MONGODB_URI;
