@@ -179,7 +179,12 @@ difference crosses a threshold you wrote down.
   finding is downgraded to `info` and `--fail-on-drift` passes, because at n = 50
   a 10pp "drop" is indistinguishable from noise.
 - **Read-only, always.** The only MongoDB operations it issues are `find`,
-  `$sample`, `countDocuments` and `estimatedDocumentCount`.
+  `$sample`, `countDocuments` and `estimatedDocumentCount`. One caveat, and it
+  is yours to make: `--filter` is passed to MongoDB **verbatim**, and `$where`,
+  `$function` and `$accumulator` make the *server* execute JavaScript when
+  server-side scripting is enabled. docpulse refuses those three unless you pass
+  `--allow-server-js`, and either way you should run docpulse with a user that
+  holds only `read` on the target database.
 - **Works with no database at all.** `--input-json` reads a JSON array or NDJSON
   file, so you can try it, test it, and run it in CI without a `mongod`. NDJSON
   is *streamed*: with `-n 1000` docpulse reads a thousand lines of your 40 GB
@@ -204,6 +209,8 @@ docpulse snapshot [options]
   -n, --sample-size <n>    Max documents to sample (default: 1000)
       --filter <json>      Query filter, JSON object (default: {})
       --sort <json>        Sort for deterministic sampling (default: {"_id":-1})
+      --allow-server-js    Allow $where / $function / $accumulator in --filter. These make
+                           the MongoDB server execute JavaScript; refused by default.
       --random             Use $sample instead of sort+limit. Unbiased but NOT reproducible.
       --label <text>       Free-text label stored in the snapshot
 ```

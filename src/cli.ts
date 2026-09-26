@@ -72,6 +72,11 @@ export function buildProgram(state: CliState = { exitCode: 0 }): Command {
       ),
     )
     .option(
+      '--allow-server-js',
+      'Allow $where / $function / $accumulator in --filter. These make the MongoDB server\n' +
+        'execute JavaScript; docpulse refuses them unless you ask for them.',
+    )
+    .option(
       '--random',
       'Use $sample instead of sort+limit. Unbiased but NOT reproducible, ' +
         'and may collection-scan on large collections.',

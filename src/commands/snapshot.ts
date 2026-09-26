@@ -16,6 +16,7 @@ export interface SnapshotOptions {
   filter: string;
   sort: string;
   random?: boolean | undefined;
+  allowServerJs?: boolean | undefined;
   label?: string | undefined;
 }
 
@@ -33,8 +34,54 @@ export function logicalCollectionName(
   return db !== undefined && db !== '' ? `${db}.${collection}` : collection;
 }
 
-/** Parse a `--filter` / `--sort` flag into a plain JSON object. */
-export function parseJsonObjectFlag(raw: string, flag: string): Record<string, unknown> {
+/**
+ * Query operators that make the *server* execute JavaScript.
+ *
+ * `$where` and `$function` (and `$accumulator` in an aggregation) are evaluated
+ * by mongod itself when server-side scripting is enabled. Even a benign one is
+ * a collection scan with a JS interpreter in the loop.
+ */
+export const SERVER_JS_OPERATORS: readonly string[] = ['$where', '$function', '$accumulator'];
+
+/**
+ * Find a server-side-JavaScript operator anywhere in a parsed flag, including
+ * inside `$or`/`$and` arrays and nested documents.
+ *
+ * Iterative on purpose: a hand-written `--filter` can nest as deep as its
+ * author likes, and a recursive scan would answer that with a stack overflow
+ * instead of a message.
+ */
+function findServerJsOperator(value: unknown): string | undefined {
+  const stack: unknown[] = [value];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (Array.isArray(current)) {
+      for (const item of current) stack.push(item);
+      continue;
+    }
+    if (current === null || typeof current !== 'object') continue;
+    const record = current as Record<string, unknown>;
+    for (const key of Object.keys(record)) {
+      if (SERVER_JS_OPERATORS.includes(key)) return key;
+      stack.push(record[key]);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Parse a `--filter` / `--sort` flag into a plain JSON object.
+ *
+ * The filter is handed to the driver verbatim, so this is also where docpulse
+ * refuses the operators that would run JavaScript on the server. It is the
+ * operator's own database, which is why `--allow-server-js` exists — but it
+ * should be a decision, not a default.
+ */
+export function parseJsonObjectFlag(
+  raw: string,
+  flag: string,
+  allowServerJs = false,
+): Record<string, unknown> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -46,6 +93,19 @@ export function parseJsonObjectFlag(raw: string, flag: string): Record<string, u
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     throw new UsageError(`${flag} must be a JSON object, e.g. ${flag} '{"status":"paid"}'`);
+  }
+
+  if (!allowServerJs) {
+    const operator = findServerJsOperator(parsed);
+    if (operator !== undefined) {
+      throw new UsageError(
+        `${flag}: ${operator} runs JavaScript on the MongoDB server`,
+        `${SERVER_JS_OPERATORS.join(', ')} are evaluated by mongod itself when server-side ` +
+          'scripting is enabled: a collection scan at best, and arbitrary code in your database at ' +
+          'worst. docpulse refuses them by default.\n' +
+          'Pass --allow-server-js if you meant it, and run docpulse as a user that holds only `read`.',
+      );
+    }
   }
   return parsed as Record<string, unknown>;
 }
@@ -66,9 +126,10 @@ export function parseSamplingFlags(options: SnapshotOptions): {
   filter: Record<string, unknown>;
   sort: Record<string, number>;
 } {
+  const allowServerJs = options.allowServerJs === true;
   return {
-    filter: parseJsonObjectFlag(options.filter, '--filter'),
-    sort: toSortSpec(parseJsonObjectFlag(options.sort, '--sort'), '--sort'),
+    filter: parseJsonObjectFlag(options.filter, '--filter', allowServerJs),
+    sort: toSortSpec(parseJsonObjectFlag(options.sort, '--sort', allowServerJs), '--sort'),
   };
 }
 
