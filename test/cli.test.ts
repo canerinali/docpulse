@@ -406,3 +406,33 @@ describe('docpulse snapshot --uri-file', () => {
     expect(result.stderr).toContain('cannot read --uri-file');
   });
 });
+
+describe('docpulse snapshot --filter and server-side JavaScript', () => {
+  // A bogus URI is enough: the flags are validated before the driver is even
+  // imported, so nothing tries to connect.
+  const target = ['-u', 'mongodb://localhost:27017', '-d', 'shop', '-c', 'orders'];
+
+  it('exits 2 on a $where filter and says how to override', async () => {
+    const result = await run(['snapshot', ...target, '--filter', '{"$where":"sleep(10000)"}']);
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('$where runs JavaScript on the MongoDB server');
+    expect(result.stderr).toContain('--allow-server-js');
+  });
+
+  it('exits 2 on $function nested inside $or', async () => {
+    const result = await run([
+      'snapshot',
+      ...target,
+      '--filter',
+      '{"$or":[{"a":1},{"b":{"$function":{"body":"x"}}}]}',
+    ]);
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('$function runs JavaScript on the MongoDB server');
+  });
+
+  it('lists --allow-server-js in the help text', async () => {
+    const result = await run(['snapshot', '--help']);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('--allow-server-js');
+  });
+});
