@@ -19,7 +19,19 @@ const BSONTYPE_MAP: Record<string, BsonTypeName> = {
   MaxKey: 'maxKey',
 };
 
+/**
+ * `_bsontype` is trusted only on a value that is *not* a plain object.
+ *
+ * A real BSON wrapper (ObjectId, Decimal128, …) is a class instance, so its
+ * prototype is not `Object.prototype`. A document may legitimately store a
+ * field literally named `_bsontype`, and honouring that would make docpulse
+ * report the containing object as a scalar and stop walking into it — an
+ * upstream producer could hide every field under it from the snapshot, which
+ * is exactly the drift docpulse exists to catch.
+ */
 function hasBsonTag(value: object): string | undefined {
+  const proto = Object.getPrototypeOf(value) as object | null;
+  if (proto === null || proto === Object.prototype) return undefined;
   const tag = (value as { _bsontype?: unknown })._bsontype;
   return typeof tag === 'string' && tag.length > 0 ? tag : undefined;
 }

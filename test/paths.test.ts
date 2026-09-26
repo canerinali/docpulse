@@ -166,3 +166,21 @@ describe('isArrayElementPath', () => {
     expect(isArrayElementPath('a.items\\[]')).toBe(false);
   });
 });
+
+describe('untrusted document keys', () => {
+  it('treats __proto__, constructor and prototype as ordinary keys', () => {
+    const doc = JSON.parse(
+      '{"__proto__":{"polluted":"yes"},"constructor":{"prototype":{"p2":"yes"}},"a":1}',
+    ) as Record<string, unknown>;
+    const paths = walkDocument(doc)
+      .filter((e): e is ValueEvent => e.kind === 'value')
+      .map((e) => e.path);
+
+    expect(paths).toContain('__proto__');
+    expect(paths).toContain('__proto__.polluted');
+    expect(paths).toContain('constructor.prototype.p2');
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(({} as Record<string, unknown>).p2).toBeUndefined();
+    expect(Object.keys(Object.prototype)).toEqual([]);
+  });
+});

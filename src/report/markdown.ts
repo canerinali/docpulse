@@ -1,11 +1,44 @@
 import type { DiffResult, Finding, Severity } from '../core/types.js';
 
-function cell(text: string): string {
-  return text.replace(/\|/g, '\\|');
+/**
+ * Everything a report prints is untrusted text.
+ *
+ * Field paths come from document keys, and BSON type names can come from a
+ * `_bsontype` value; labels, collection names and refusal details come out of
+ * snapshot *files*, which a pull request can change. This report is designed to
+ * be pasted into a GitHub job summary or a PR comment (see
+ * `examples/drift-check.yml`), so a newline or a backtick in any of that text
+ * would let a document key inject its own Markdown: extra table rows, headings,
+ * links. Control characters therefore become visible escapes and a literal
+ * backtick becomes `\u0060`, because Markdown has no way to escape a backtick
+ * inside a code span.
+ */
+export function cell(text: string): string {
+  return sanitize(text).replace(/\|/g, '\\|');
+}
+
+/** Sanitising for text printed inside a fenced block, where `|` is literal. */
+function fenced(text: string): string {
+  return text.split('\n').map(sanitize).join('\n');
+}
+
+function sanitize(text: string): string {
+  let out = '';
+  for (const char of text) {
+    const code = char.codePointAt(0) as number;
+    if (char === '`') out += '\\u0060';
+    else if (char === '\n') out += '\\n';
+    else if (char === '\r') out += '\\r';
+    else if (char === '\t') out += '\\t';
+    else if (code < 0x20 || code === 0x7f || code === 0x2028 || code === 0x2029) {
+      out += `\\u${code.toString(16).padStart(4, '0')}`;
+    } else out += char;
+  }
+  return out;
 }
 
 function labelOf(label: string | null): string {
-  return label === null ? '(unlabelled)' : `\`${label}\``;
+  return label === null ? '(unlabelled)' : `\`${cell(label)}\``;
 }
 
 function countBySeverity(findings: Finding[]): Record<Severity, number> {
@@ -38,18 +71,18 @@ export function renderMarkdown(result: DiffResult): string {
   const lines: string[] = ['# docpulse drift report', ''];
 
   lines.push(
-    `\`${baseline.collection}\` — baseline ${labelOf(baseline.label)} (${baseline.sampledDocs} docs) ` +
+    `\`${cell(baseline.collection)}\` — baseline ${labelOf(baseline.label)} (${baseline.sampledDocs} docs) ` +
       `→ current ${labelOf(current.label)} (${current.sampledDocs} docs)`,
   );
 
   if (result.refusal !== undefined) {
     lines.push('');
-    lines.push(`## Comparison refused: \`${result.refusal.code}\``);
+    lines.push(`## Comparison refused: \`${cell(result.refusal.code)}\``);
     lines.push('');
-    lines.push(result.refusal.message);
+    lines.push(fenced(result.refusal.message));
     lines.push('');
     lines.push('```');
-    lines.push(result.refusal.detail);
+    lines.push(fenced(result.refusal.detail));
     lines.push('```');
     return `${lines.join('\n')}\n`;
   }
@@ -62,7 +95,7 @@ export function renderMarkdown(result: DiffResult): string {
   if (result.warnings.length > 0) {
     lines.push('');
     for (const warning of result.warnings) {
-      lines.push(`> **Warning:** ${warning}`);
+      lines.push(`> **Warning:** ${cell(warning)}`);
       lines.push('>');
     }
     lines.pop();
@@ -90,7 +123,7 @@ export function renderMarkdown(result: DiffResult): string {
     );
     lines.push('');
     for (const item of result.suppressed) {
-      lines.push(`- \`${item.path}\` — ${item.detail}`);
+      lines.push(`- \`${cell(item.path)}\` — ${cell(item.detail)}`);
     }
     lines.push('');
     lines.push('</details>');

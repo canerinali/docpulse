@@ -94,6 +94,12 @@ Whether `""` is a bug is a question about your domain, not about your schema.
 `UUID`, which extends `Binary`, are not mislabelled), then `Array.isArray`,
 `Date`, `RegExp`, typed arrays, then `typeof`.
 
+`_bsontype` is only believed on a value that is *not* a plain object, because a
+document may legitimately store a field called `_bsontype`. A plain
+`{ "_bsontype": "ObjectId", … }` is an `object` and docpulse walks into it like
+any other; otherwise a producer could hide every field beneath such an object
+from the snapshot simply by writing that key.
+
 The 16 canonical names are: `array`, `binData`, `bool`, `date`, `decimal`,
 `double`, `int`, `javascript`, `long`, `null`, `object`, `objectId`, `regex`,
 `string`, `symbol`, `timestamp`. Exotic wrappers (`minKey`, `maxKey`, `dbRef`)
@@ -175,6 +181,37 @@ train you to ignore it.
 If you genuinely want findings on a small collection, lower `minSampledDocs`
 yourself in `docpulse.config.json`. That is a decision, and it should be written
 down where your team can see it.
+
+## Handling untrusted data
+
+A snapshot is meant to be committed and a drift report is meant to be published
+(`examples/drift-check.yml` writes it to the job summary). Both are built from
+data docpulse does not control, so it is worth being explicit about what ends up
+where.
+
+- **Your `--filter` is stored verbatim** in the snapshot's `sampling.filter`,
+  and printed in full when `diff` refuses a filter mismatch. That is deliberate:
+  a presence drop caused by a narrower query is not drift, so the filter has to
+  travel with the snapshot. It also means a filter that matches on an e-mail
+  address, an account identifier or anything else you would not put in git ends
+  up in git. Filter on non-sensitive fields, or accept that the value is public.
+- **Your connection string is never stored or printed.** It is not written to
+  the snapshot, not written to any report, and not included in the error
+  docpulse prints when a connection fails — only the driver's own (credential-
+  free) message is shown. It is, however, visible in `ps` output and in your
+  shell history when you pass it as `--uri`, so prefer the `MONGODB_URI`
+  environment variable, and a CI secret in a pipeline.
+- **`--filter` is passed to MongoDB unchanged.** docpulse issues only reads, but
+  a filter containing `$where`, `$function` or `$accumulator` makes the *server*
+  run JavaScript. Do not build a `--filter` out of anything you did not write
+  yourself, such as a workflow input.
+- **Reports escape the data they print.** Field paths are document keys and BSON
+  type names can come from a stored `_bsontype` value, so the Markdown and table
+  reporters turn control characters into visible escapes (`\n`) and a literal
+  backtick into `\u0060`. Without that, a document key containing a newline
+  could forge extra rows, headings or links in a report pasted into a pull
+  request. A path shown with `\n` or `\u0060` in it really does contain that
+  character in your collection.
 
 ## What this tool does not guarantee
 

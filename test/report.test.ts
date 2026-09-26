@@ -67,6 +67,52 @@ describe('markdown reporter', () => {
     expect(md).toContain('below minSampledDocs');
   });
 
+  it('cannot be escaped by a document key: no injected rows, headings or HTML', () => {
+    // A field path is a document key, and the report is pasted into a GitHub
+    // job summary. A newline plus a backtick would otherwise close the code
+    // span, end the row and let the key write its own Markdown.
+    const evil = 'ok`\n\n## INJECTED\n\n<img src=x onerror=alert(1)>\n\n| 9 | `all_clear` | `x` | y | z | w |';
+    const a = snap({ fields: [docField('safe', { units: 1000, present: 1000, types: { int: 1000 } })] });
+    const b = snap({
+      fields: [
+        docField('safe', { units: 1000, present: 1000, types: { int: 1000 } }),
+        docField(evil, { units: 1000, present: 1000, types: { int: 1000 } }),
+      ],
+    });
+    const md = renderMarkdown(diffSnapshots(a, b, DEFAULT_CONFIG));
+
+    // Nothing the key contains reaches the start of a line, so it can be
+    // neither a heading, nor a new table row, nor a raw HTML block.
+    const lines = md.split('\n');
+    expect(lines.filter((l) => /^#/.test(l))).toEqual(['# docpulse drift report']);
+    expect(lines.some((l) => /^</.test(l.trim()) && l.includes('img'))).toBe(false);
+    expect(lines.filter((l) => /^\| \d+ \|/.test(l))).toHaveLength(1);
+    // It is rendered, just neutered: visible escapes instead of real control
+    // characters and a real backtick.
+    expect(md).toContain('\\n');
+    expect(md).toContain('\\u0060');
+  });
+
+  it('sanitises a label, a collection name and a BSON type name from a snapshot file', () => {
+    const a = snap({
+      collection: 'shop.ord`ers',
+      label: 'wk\n# OWNED',
+      fields: [docField('f', { units: 1000, present: 1000, types: { int: 1000 } })],
+    });
+    const b = snap({
+      collection: 'shop.ord`ers',
+      label: 'wk39',
+      fields: [docField('f', { units: 1000, present: 1000, types: { 'evil`\ntype': 1000 } })],
+    });
+    const md = renderMarkdown(diffSnapshots(a, b, DEFAULT_CONFIG));
+    const lines = md.split('\n');
+    expect(lines.filter((l) => /^#/.test(l))).toEqual(['# docpulse drift report']);
+    expect(lines.some((l) => /^type/.test(l))).toBe(false);
+    // Header line: both the collection and the label are on it, escaped.
+    expect(lines[2]).toContain('shop.ord\\u0060ers');
+    expect(lines[2]).toContain('wk\\n# OWNED');
+  });
+
   it('escapes a pipe inside a path so the table survives', () => {
     const a = snap({ fields: [docField('we|ird', { units: 1000, present: 900, types: { string: 900 } })] });
     const b = snap({ fields: [docField('we|ird', { units: 1000, present: 100, types: { string: 100 } })] });
@@ -148,6 +194,19 @@ describe('table reporter', () => {
     const other = { ...CURRENT, collection: 'shop.invoices' };
     const text = renderTable(diffSnapshots(BASELINE, other, DEFAULT_CONFIG));
     expect(text).toContain('REFUSED (collection_mismatch)');
+  });
+
+  it('keeps its columns when a document key contains a newline', () => {
+    const a = snap({ fields: [docField('safe', { units: 1000, present: 1000, types: { int: 1000 } })] });
+    const b = snap({
+      fields: [
+        docField('safe', { units: 1000, present: 1000, types: { int: 1000 } }),
+        docField('bad\nkey', { units: 1000, present: 1000, types: { int: 1000 } }),
+      ],
+    });
+    const text = renderTable(diffSnapshots(a, b, DEFAULT_CONFIG));
+    expect(text).toContain('bad\\nkey');
+    expect(text).not.toMatch(/^key/m);
   });
 });
 
