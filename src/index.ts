@@ -62,5 +62,6 @@ export {
   type ReportFormat,
 } from './report/index.js';
 export { DocpulseError, UsageError } from './errors.js';
+export { redactConnectionStrings } from './redact.js';
 export { VERSION } from './version.js';
 export * from './core/types.js';
