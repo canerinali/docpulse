@@ -35,6 +35,27 @@ function prose(text: string): string {
   return sanitize(text).replace(/[\\`*_[\]<>&~|]/g, (m) => `\\${m}`);
 }
 
+/**
+ * A warning line is the one piece of report text docpulse writes with a little
+ * Markdown of its own: `diffSnapshots` wraps a snapshot's `sampling.filter` in
+ * a code span so the JSON cannot render as prose. Backtick pairs docpulse put
+ * there are therefore kept, and everything else goes through `prose()` — inside
+ * a span as well as outside it. Escaping inside a code span is redundant by
+ * CommonMark and deliberate here: it costs a few backslashes and leaves the
+ * text inert even in a renderer that mishandles the span, or if untrusted text
+ * ever closes one early.
+ */
+function warningLine(text: string): string {
+  // An odd number of backticks is not something docpulse writes, so treat the
+  // whole line as prose rather than guessing where a span was meant to end.
+  const backticks = text.match(/`/g)?.length ?? 0;
+  if (backticks === 0 || backticks % 2 === 1) return prose(text);
+  return text
+    .split(/`([^`]*)`/)
+    .map((part, index) => (index % 2 === 1 ? `\`${prose(part)}\`` : prose(part)))
+    .join('');
+}
+
 function sanitize(text: string): string {
   let out = '';
   for (const char of text) {
@@ -108,7 +129,7 @@ export function renderMarkdown(result: DiffResult): string {
   if (result.warnings.length > 0) {
     lines.push('');
     for (const warning of result.warnings) {
-      lines.push(`> **Warning:** ${prose(warning)}`);
+      lines.push(`> **Warning:** ${warningLine(warning)}`);
       lines.push('>');
     }
     lines.pop();
