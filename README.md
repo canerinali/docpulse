@@ -147,6 +147,13 @@ of its twelve entries:
 }
 ```
 
+The snapshot records the exact `--filter` the sample was taken with, because
+`diff` refuses to compare two snapshots taken with different filters — a
+presence drop caused by a narrower query is not drift, so the filter has to
+travel with the data. Snapshots are meant to be committed, so **do not filter on
+secret values**: `--filter '{"apiToken":"sk-live-…"}'` writes that token into
+your repository, permanently.
+
 ## The problem
 
 Your `orders` collection has no schema, so nothing tells you when an upstream
