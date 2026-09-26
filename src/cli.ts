@@ -39,7 +39,16 @@ export function buildProgram(state: CliState = { exitCode: 0 }): Command {
     .description(
       'Sample a MongoDB collection (or a local JSON file) and write a field-schema snapshot.',
     )
-    .option('-u, --uri <uri>', 'MongoDB connection string (env: MONGODB_URI)')
+    .option(
+      '-u, --uri <uri>',
+      'MongoDB connection string. Prefer the MONGODB_URI env var or --uri-file: an argument is\n' +
+        'visible to every user on the machine in the process list (and in your shell history).',
+    )
+    .option(
+      '--uri-file <path>',
+      'Read the connection string from a file, the usual Docker/Kubernetes secret mount.\n' +
+        'Trailing newline trimmed. Not combinable with --uri or --input-json.',
+    )
     .option('-d, --db <name>', 'Database name')
     .option(
       '-c, --collection <name>',
@@ -71,7 +80,8 @@ export function buildProgram(state: CliState = { exitCode: 0 }): Command {
     .addHelpText(
       'after',
       '\nExamples:\n' +
-        '  docpulse snapshot -u "$MONGODB_URI" -d shop -c orders -o baseline.json\n' +
+        '  MONGODB_URI=... docpulse snapshot -d shop -c orders -o baseline.json\n' +
+        '  docpulse snapshot --uri-file /run/secrets/mongodb-uri -d shop -c orders -o baseline.json\n' +
         '  docpulse snapshot --input-json dump.ndjson --label fixture -o fixture.json',
     )
     .action(async (options: SnapshotOptions) => {

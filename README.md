@@ -28,8 +28,15 @@ npm install -g docpulse    # or run it without installing: npx docpulse --help
 ## Usage
 
 ```sh
-docpulse snapshot -u "$MONGODB_URI" -d shop -c orders -o today.json && docpulse diff baseline.json today.json --fail-on-drift
+export MONGODB_URI="mongodb+srv://..."   # docpulse reads it from the environment
+docpulse snapshot -d shop -c orders -o today.json && docpulse diff baseline.json today.json --fail-on-drift
 ```
+
+docpulse reads the connection string from `MONGODB_URI`, or from a file with
+`--uri-file /run/secrets/mongodb-uri` — the usual Docker and Kubernetes secret
+mount. There is a `--uri` flag, but prefer either of the other two: an argument
+is visible to every user on the machine (`/proc/<pid>/cmdline` is world-readable
+on Linux), and it lands in your shell history and in CI logs under `set -x`.
 
 `snapshot` writes the file. `diff` reports only what crosses your thresholds and, with `--fail-on-drift`, exits
 `1` when something does (`0` = clean, or drift without that flag; `2` = bad input or a comparison docpulse
@@ -186,7 +193,10 @@ difference crosses a threshold you wrote down.
 ```
 docpulse snapshot [options]
 
-  -u, --uri <uri>          MongoDB connection string (env: MONGODB_URI)
+  -u, --uri <uri>          MongoDB connection string. Prefer MONGODB_URI or --uri-file:
+                           an argument is visible in the process list.
+      --uri-file <path>    Read the connection string from a file (secret mount).
+                           Trailing newline trimmed. Not with --uri or --input-json.
   -d, --db <name>          Database name
   -c, --collection <name>  Collection name (required unless --input-json)
       --input-json <file>  Read documents from a JSON array or NDJSON file instead of MongoDB
@@ -215,6 +225,14 @@ Exit codes: 0 = no drift (or drift without --fail-on-drift)
 With `--input-json`, `-d`/`-c` name the *logical* collection the documents belong
 to. Pass the same pair for both files you intend to compare — `diff` refuses to
 compare snapshots of different collections.
+
+The connection string is resolved in this order: `--uri-file`, then `--uri`,
+then `MONGODB_URI`. `--uri-file` reads one line from a file and trims the
+trailing newline, so a Docker or Kubernetes secret works unmodified:
+
+```sh
+docpulse snapshot --uri-file /run/secrets/mongodb-uri -d shop -c orders -o today.json
+```
 
 ## Configuration
 

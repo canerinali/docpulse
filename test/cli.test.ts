@@ -356,3 +356,53 @@ describe('end-to-end with no database', () => {
     expect(parsed.findings.find((f) => f.type === 'type_changed')?.path).toBe('lines.items[].qty');
   }, 60_000);
 });
+
+describe('docpulse snapshot --uri-file', () => {
+  it('steers the reader away from --uri in the help text', async () => {
+    const result = await run(['snapshot', '--help']);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('--uri-file <path>');
+    expect(result.stdout).toContain('process list');
+    expect(result.stdout).toContain('MONGODB_URI');
+  });
+
+  it('refuses --uri-file together with --uri', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'docpulse-cli-'));
+    const secret = join(dir, 'mongodb-uri');
+    await writeFile(secret, 'mongodb://localhost:27017\n', 'utf8');
+    const result = await run([
+      'snapshot',
+      '--uri-file',
+      secret,
+      '-u',
+      'mongodb://localhost:27017',
+      '-d',
+      'shop',
+      '-c',
+      'orders',
+    ]);
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('--uri-file cannot be combined with --uri');
+  });
+
+  it('refuses --uri-file together with --input-json', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'docpulse-cli-'));
+    const secret = join(dir, 'mongodb-uri');
+    await writeFile(secret, 'mongodb://localhost:27017\n', 'utf8');
+    const result = await run([
+      'snapshot',
+      '--input-json',
+      join(ROOT, 'test', 'fixtures', 'docs.json'),
+      '--uri-file',
+      secret,
+    ]);
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('--uri-file cannot be combined with --input-json');
+  });
+
+  it('exits 2 when the secret file is missing', async () => {
+    const result = await run(['snapshot', '--uri-file', 'no-such-secret', '-d', 'shop', '-c', 'orders']);
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('cannot read --uri-file');
+  });
+});
