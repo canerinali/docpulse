@@ -12,6 +12,10 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # Repeated at job level: a workflow-level block is inherited, but a job that
+    # declares its own is the one thing a later edit cannot quietly widen.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -21,6 +25,10 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # Fail the build on a known-vulnerable dependency rather than finding out
+      # from a user. Dependabot (.github/dependabot.yml) opens the PRs.
+      - run: npm audit --audit-level=high
 
       # tsc --noEmit + vitest run. No database service: the live integration
       # test skips itself when MONGODB_URI is unset.

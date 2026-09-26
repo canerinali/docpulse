@@ -1,0 +1,19 @@
+# Keeps the three runtime dependencies (and the dev toolchain) current without
+# anyone having to remember. `npm audit --audit-level=high` in ci.yml is the
+# other half: this opens the PR, that fails the build if nobody merges it.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+
+  # The workflows pin actions/* by tag; this keeps those tags moving forward.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

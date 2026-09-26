@@ -20,6 +20,11 @@ permissions:
 jobs:
   drift:
     runs-on: ubuntu-latest
+    # Also declared at job level: this file gets copied into repositories that
+    # hold a production database credential, and a job that states its own
+    # permissions cannot be widened by an edit to the top of the file.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -31,7 +36,7 @@ jobs:
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI_READONLY }}
         run: |
-          npx docpulse@0.1 snapshot \
+          npx docpulse@0.1.0 snapshot \
             --db shop \
             --collection orders \
             --sample-size 5000 \
@@ -40,7 +45,7 @@ jobs:
 
       - name: Fail if the schema drifted past the thresholds
         run: |
-          npx docpulse@0.1 diff \
+          npx docpulse@0.1.0 diff \
             contracts/orders.baseline.json \
             current.snapshot.json \
             --format markdown \
