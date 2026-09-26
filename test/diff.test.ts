@@ -13,6 +13,7 @@ import {
   canonicalStringify,
   parseSnapshot,
 } from '../src/core/snapshotSchema.js';
+import { DocpulseError } from '../src/errors.js';
 import type { Config, Finding } from '../src/core/types.js';
 import { docField, elemField, snap } from './helpers/snapshots.js';
 
@@ -366,18 +367,39 @@ describe('filter canonicalisation is not bypassable', () => {
     expect(diffSnapshots(left, right, cfg()).refusal?.code).toBe('sampling_mismatch');
   });
 
-  it('survives zod validation: a __proto__ filter key read from a file still refuses', () => {
+  it('refuses a snapshot file whose sampling.filter carries a __proto__ key', () => {
     // zod rebuilds a z.record into an object literal, where assigning
-    // `__proto__` hits the prototype setter and the key vanishes.
+    // `__proto__` hits the prototype setter and the key vanishes — which would
+    // make a filter of {"__proto__":…,"z":1} compare equal to one of {"z":1}
+    // and bypass the mismatch guard for that key. `__proto__` is not a field
+    // name MongoDB can store, so the file is refused outright instead.
     const base = snap({ fields: a.fields });
     const text = (filter: string): string =>
       JSON.stringify(base).replace('"filter":{}', `"filter":${filter}`);
-    const left = parseSnapshot(text('{"__proto__":{"status":"paid"},"z":1}'), 'left');
-    const right = parseSnapshot(text('{"z":1}'), 'right');
 
-    expect(Object.getOwnPropertyNames(left.sampling.filter)).toContain('__proto__');
-    expect(diffSnapshots(left, right, cfg()).refusal?.code).toBe('sampling_mismatch');
+    let thrown: unknown;
+    try {
+      parseSnapshot(text('{"__proto__":{"status":"paid"},"z":1}'), 'left.json');
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(DocpulseError);
+    expect((thrown as DocpulseError).exitCode).toBe(2);
+    expect((thrown as DocpulseError).message).toBe(
+      'left.json: sampling.filter contains a __proto__ key',
+    );
+    expect((thrown as DocpulseError).detail).toMatch(/Remove the key, or re-take the snapshot\./);
+
+    // Nested just as firmly, and no pollution on the way past.
+    expect(() => parseSnapshot(text('{"$or":[{"__proto__":{"a":1}}]}'), 'x.json')).toThrow(
+      /sampling\.filter contains a __proto__ key/,
+    );
     expect(({} as Record<string, unknown>).status).toBeUndefined();
+    expect(({} as Record<string, unknown>).a).toBeUndefined();
+
+    // An ordinary filter still reads back, keys intact.
+    const ok = parseSnapshot(text('{"z":1}'), 'right.json');
+    expect(ok.sampling.filter).toEqual({ z: 1 });
   });
 
   it('refuses a filter nested deeper than MongoDB allows instead of overflowing the stack', () => {

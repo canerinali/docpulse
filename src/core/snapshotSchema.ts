@@ -100,6 +100,30 @@ function canonicalize(value: unknown, depth = 0): unknown {
 }
 
 /**
+ * True when a `__proto__` key appears anywhere in the value, as an own
+ * property. `JSON.parse` stores such a key as an own data property rather than
+ * invoking the `Object.prototype.__proto__` setter, so this sees exactly what
+ * the file said. Iterative, so the depth cap belongs to `canonicalize` alone.
+ */
+function hasProtoKey(value: unknown): boolean {
+  const stack: unknown[] = [value];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (Array.isArray(current)) {
+      for (const item of current) stack.push(item);
+      continue;
+    }
+    if (current === null || typeof current !== 'object') continue;
+    const record = current as Record<string, unknown>;
+    for (const key of Object.keys(record)) {
+      if (key === '__proto__') return true;
+      stack.push(record[key]);
+    }
+  }
+  return false;
+}
+
+/**
  * Serialise a snapshot with a fixed key order, so two runs over the same data
  * are byte-identical apart from `createdAt`.
  */
@@ -151,6 +175,22 @@ export function validateSnapshot(value: unknown, origin: string): Snapshot {
   const result = snapshotSchema.safeParse(value);
   if (!result.success) {
     throw new UsageError(`${origin}: not a valid docpulse snapshot`, z.prettifyError(result.error));
+  }
+
+  const rawFilter = (value as { sampling?: { filter?: unknown } }).sampling?.filter;
+  if (hasProtoKey(rawFilter)) {
+    // `__proto__` is not a usable MongoDB field name, so no legitimate snapshot
+    // carries one. It is also the one key that does not survive validation
+    // intact, and `diff` refuses to compare snapshots taken with different
+    // filters — so silently dropping it would let two genuinely different
+    // samples look identical. Refuse the file instead of guessing.
+    throw new UsageError(
+      `${origin}: sampling.filter contains a __proto__ key`,
+      'That is not a field name MongoDB can store, so this snapshot was hand-edited. docpulse ' +
+        'compares the two snapshots\' filters before it compares anything else, and it will not ' +
+        'run that comparison against a key it cannot represent faithfully.\n' +
+        'Remove the key, or re-take the snapshot.',
+    );
   }
 
   const snapshot = result.data as Snapshot;

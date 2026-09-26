@@ -436,3 +436,23 @@ describe('docpulse snapshot --filter and server-side JavaScript', () => {
     expect(result.stdout).toContain('--allow-server-js');
   });
 });
+
+describe('docpulse diff refuses a hand-edited __proto__ filter', () => {
+  it('exits 2 with a message naming the file', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'docpulse-cli-'));
+    const good = JSON.parse(
+      readFileSync(join(ROOT, 'examples', 'baseline.snapshot.json'), 'utf8'),
+    ) as Record<string, unknown>;
+    const edited = join(dir, 'edited.snapshot.json');
+    await writeFile(
+      edited,
+      JSON.stringify(good).replace('"filter":{}', '"filter":{"__proto__":{"status":"paid"}}'),
+      'utf8',
+    );
+
+    const result = await run(['diff', join(ROOT, 'examples', 'baseline.snapshot.json'), edited]);
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('sampling.filter contains a __proto__ key');
+    expect(result.stderr).toContain('edited.snapshot.json');
+  });
+});
