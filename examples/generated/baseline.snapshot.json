@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "tool": "docpulse@0.1.0",
   "label": "week-38",
-  "createdAt": "2026-09-26T18:31:13.932Z",
+  "createdAt": "2026-09-26T18:44:18.999Z",
   "collection": "shop.orders",
   "sampling": {
     "mode": "input-file",
