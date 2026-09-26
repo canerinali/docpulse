@@ -79,6 +79,14 @@ describe('bsonTypeOf', () => {
     expect(bsonTypeOf(Long.fromString('12'))).toBe('long');
   });
 
+  it('ignores a _bsontype field stored in a plain document object', () => {
+    // A producer can legitimately store a field called `_bsontype`. Trusting it
+    // would report the object as a scalar and hide every field under it.
+    expect(bsonTypeOf({ _bsontype: 'ObjectId', hidden: 1 })).toBe('object');
+    expect(bsonTypeOf({ _bsontype: 'Decimal128' })).toBe('object');
+    expect(bsonTypeOf(Object.assign(Object.create(null), { _bsontype: 'ObjectId' }))).toBe('object');
+  });
+
   it('gives exotic BSON wrappers an honest name instead of "unknown"', () => {
     expect(bsonTypeOf(new MinKey())).toBe('minKey');
     expect(bsonTypeOf(new MaxKey())).toBe('maxKey');

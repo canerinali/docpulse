@@ -60,6 +60,14 @@ export const snapshotSchema = z.object({
 });
 
 /**
+ * Deepest structure `canonicalize` will walk. MongoDB itself refuses BSON
+ * nested more than 100 levels deep, so nothing legitimate reaches this; the cap
+ * exists so a hand-edited snapshot file cannot turn a `sampling.filter` into an
+ * unbounded recursion and crash `diff` with a bare stack-overflow message.
+ */
+export const MAX_CANONICAL_DEPTH = 100;
+
+/**
  * Recursively key-sorted, compact JSON. Used to compare two snapshots'
  * `sampling.filter` without caring how the operator happened to type it.
  */
@@ -67,12 +75,25 @@ export function canonicalStringify(value: unknown): string {
   return JSON.stringify(canonicalize(value));
 }
 
-function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalize);
+function canonicalize(value: unknown, depth = 0): unknown {
+  if (depth > MAX_CANONICAL_DEPTH) {
+    throw new UsageError(
+      `nested more than ${MAX_CANONICAL_DEPTH} levels deep`,
+      'A snapshot\'s sampling.filter cannot be nested deeper than MongoDB allows.',
+    );
+  }
+  if (Array.isArray(value)) return value.map((item) => canonicalize(item, depth + 1));
   if (value !== null && typeof value === 'object') {
     const source = value as Record<string, unknown>;
-    const out: Record<string, unknown> = {};
-    for (const key of Object.keys(source).sort()) out[key] = canonicalize(source[key]);
+    // Null-prototype, so a key literally called `__proto__` is stored as an own
+    // property and survives into the output instead of silently invoking the
+    // `Object.prototype.__proto__` setter and vanishing — which would make two
+    // different filters canonicalise to the same string and defeat the
+    // "refuse to compare different filters" guard.
+    const out: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+    for (const key of Object.keys(source).sort()) {
+      out[key] = canonicalize(source[key], depth + 1);
+    }
     return out;
   }
   return value;

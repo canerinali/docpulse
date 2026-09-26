@@ -8,6 +8,7 @@ import {
   presenceRatio,
   significantTypes,
 } from '../src/core/diff.js';
+import { MAX_CANONICAL_DEPTH, canonicalStringify } from '../src/core/snapshotSchema.js';
 import type { Config, Finding } from '../src/core/types.js';
 import { docField, elemField, snap } from './helpers/snapshots.js';
 
@@ -343,5 +344,33 @@ describe('ratio helpers', () => {
     expect(presenceRatio(undefined)).toBe(0);
     expect(presenceRatio(docField('x', { units: 0, present: 0, types: {} }))).toBe(0);
     expect(nullRatio(docField('x', { units: 10, present: 0, types: {} }))).toBe(0);
+  });
+});
+
+describe('filter canonicalisation is not bypassable', () => {
+  const a = snap({ fields: [docField('f', { units: 1000, present: 1000, types: { int: 1000 } })] });
+
+  it('keeps a key literally named __proto__ instead of swallowing it', () => {
+    const withProto = JSON.parse('{"__proto__":{"evil":1},"status":"paid"}') as Record<string, unknown>;
+    const without = JSON.parse('{"status":"paid"}') as Record<string, unknown>;
+    expect(canonicalStringify(withProto)).toContain('__proto__');
+    expect(canonicalStringify(withProto)).not.toBe(canonicalStringify(without));
+    expect(({} as Record<string, unknown>).evil).toBeUndefined();
+
+    const left = snap({ fields: a.fields, sampling: { filter: withProto } });
+    const right = snap({ fields: a.fields, sampling: { filter: without } });
+    expect(diffSnapshots(left, right, cfg()).refusal?.code).toBe('sampling_mismatch');
+  });
+
+  it('refuses a filter nested deeper than MongoDB allows instead of overflowing the stack', () => {
+    let deep: Record<string, unknown> = {};
+    const root = deep;
+    for (let i = 0; i < MAX_CANONICAL_DEPTH + 10; i += 1) {
+      const next: Record<string, unknown> = {};
+      deep.a = next;
+      deep = next;
+    }
+    const left = snap({ fields: a.fields, sampling: { filter: root } });
+    expect(() => diffSnapshots(left, left, cfg())).toThrow(/nested more than 100 levels deep/);
   });
 });
