@@ -46,6 +46,17 @@ function toSortSpec(raw: Record<string, unknown>, flag: string): Record<string, 
   return out;
 }
 
+/** Shared by the CLI layer to validate the MongoDB-only flags. */
+export function parseSamplingFlags(options: SnapshotOptions): {
+  filter: Record<string, unknown>;
+  sort: Record<string, number>;
+} {
+  return {
+    filter: parseJsonObjectFlag(options.filter, '--filter'),
+    sort: toSortSpec(parseJsonObjectFlag(options.sort, '--sort'), '--sort'),
+  };
+}
+
 /** Build the right {@link DocumentSource} for the given flags. */
 export async function createSource(options: SnapshotOptions): Promise<DocumentSource> {
   if (options.inputJson !== undefined) {
@@ -61,13 +72,38 @@ export async function createSource(options: SnapshotOptions): Promise<DocumentSo
     if (options.random === true) {
       throw new UsageError('--random applies to MongoDB sampling only, not --input-json');
     }
+    if (options.filter !== '{}') {
+      throw new UsageError('--filter applies to MongoDB sampling only, not --input-json');
+    }
     return createFileSource(options.inputJson, options.sampleSize);
   }
 
-  throw new UsageError(
-    'MongoDB sampling is not wired up in this build',
-    'Use --input-json <file> to snapshot documents from a local JSON array or NDJSON file.',
-  );
+  const uri = options.uri ?? process.env.MONGODB_URI;
+  if (uri === undefined || uri === '') {
+    throw new UsageError(
+      'a MongoDB connection string is required',
+      'Pass --uri, set MONGODB_URI, or read local documents with --input-json <file>.',
+    );
+  }
+  if (options.db === undefined || options.db === '') {
+    throw new UsageError('--db <name> is required when sampling MongoDB');
+  }
+  if (options.collection === undefined || options.collection === '') {
+    throw new UsageError('--collection <name> is required unless --input-json is given');
+  }
+
+  const { filter, sort } = parseSamplingFlags(options);
+  // Imported lazily so the --input-json path never loads the driver.
+  const { MongoDocumentSource } = await import('../source/mongoSource.js');
+  return new MongoDocumentSource({
+    uri,
+    db: options.db,
+    collection: options.collection,
+    sampleSize: options.sampleSize,
+    filter,
+    sort,
+    random: options.random === true,
+  });
 }
 
 /** Run `docpulse snapshot` and return the snapshot it wrote. */
@@ -101,15 +137,4 @@ export async function runSnapshot(
     stdout.write(text);
   }
   return snapshot;
-}
-
-/** Shared by the CLI layer to validate the MongoDB-only flags. */
-export function parseSamplingFlags(options: SnapshotOptions): {
-  filter: Record<string, unknown>;
-  sort: Record<string, number>;
-} {
-  return {
-    filter: parseJsonObjectFlag(options.filter, '--filter'),
-    sort: toSortSpec(parseJsonObjectFlag(options.sort, '--sort'), '--sort'),
-  };
 }
