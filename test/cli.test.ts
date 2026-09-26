@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { chmodSync, existsSync, readFileSync } from 'node:fs';
+import { mkdir, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +38,9 @@ beforeAll(async () => {
     cwd: ROOT,
   });
   expect(existsSync(CLI)).toBe(true);
+  // `npm run build` chmods the bin; do the same here so the symlink tests below
+  // exercise exactly what npm installs.
+  chmodSync(CLI, 0o755);
 }, 120_000);
 
 describe('docpulse --help / --version', () => {
@@ -58,6 +61,57 @@ describe('docpulse --help / --version', () => {
   it('exits 2 on an unknown command', async () => {
     const result = await run(['explode']);
     expect(result.code).toBe(2);
+  });
+});
+
+describe('the npm bin entry point', () => {
+  /**
+   * npm installs the bin as `node_modules/.bin/docpulse`, a **symlink** to
+   * dist/cli.js. Node resolves that symlink for `import.meta.url` but not for
+   * `process.argv[1]`, so a naive entry-point check makes the CLI exit 0 having
+   * printed nothing. Reproduce npm's layout exactly.
+   */
+  it('runs when invoked through a bin symlink, not just by real path', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'docpulse-bin-'));
+    await mkdir(join(dir, '.bin'), { recursive: true });
+    const link = join(dir, '.bin', 'docpulse');
+    await symlink(CLI, link);
+
+    const { stdout } = await execFileAsync(link, ['--version'], {
+      cwd: dir,
+      env: { ...process.env, MONGODB_URI: '' },
+    });
+    const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as { version: string };
+    expect(stdout.trim()).toBe(pkg.version);
+  });
+
+  it('still reports drift exit codes through the symlink', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'docpulse-bin-'));
+    await mkdir(join(dir, '.bin'), { recursive: true });
+    const link = join(dir, '.bin', 'docpulse');
+    await symlink(CLI, link);
+
+    let code = 0;
+    let stdout = '';
+    try {
+      const out = await execFileAsync(
+        link,
+        [
+          'diff',
+          join(ROOT, 'examples', 'baseline.snapshot.json'),
+          join(ROOT, 'examples', 'current.snapshot.json'),
+          '--fail-on-drift',
+        ],
+        { cwd: dir, env: { ...process.env, MONGODB_URI: '' } },
+      );
+      stdout = out.stdout;
+    } catch (error) {
+      const e = error as { code?: number; stdout?: string };
+      code = e.code ?? 1;
+      stdout = e.stdout ?? '';
+    }
+    expect(code).toBe(1);
+    expect(stdout).toContain('**5 findings**');
   });
 });
 

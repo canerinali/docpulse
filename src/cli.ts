@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { pathToFileURL } from 'node:url';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import { DocpulseError } from './errors.js';
 import { runDiff, type DiffOptions } from './commands/diff.js';
@@ -128,8 +129,25 @@ export async function main(argv: string[] = process.argv): Promise<number> {
   }
 }
 
-const invokedDirectly =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+/**
+ * True when this file is the process entry point.
+ *
+ * `process.argv[1]` is whatever path the shell used, which for an npm-installed
+ * bin is the `node_modules/.bin/docpulse` **symlink**, while `import.meta.url`
+ * is always the resolved real path. Comparing the two directly would make the
+ * CLI silently do nothing when run through its own bin, so resolve both.
+ */
+function isEntryPoint(): boolean {
+  const entry = process.argv[1];
+  if (entry === undefined) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+const invokedDirectly = isEntryPoint();
 
 if (invokedDirectly) {
   main().then(
