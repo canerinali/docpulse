@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# The job only reads the repository; nothing here needs a writable token.
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest

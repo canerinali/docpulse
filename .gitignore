@@ -10,3 +10,6 @@ coverage/
 .env.*
 !.env.example
 /tmp/
+
+# internal launch notes, not part of the published project
+LAUNCH.md

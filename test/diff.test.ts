@@ -8,7 +8,11 @@ import {
   presenceRatio,
   significantTypes,
 } from '../src/core/diff.js';
-import { MAX_CANONICAL_DEPTH, canonicalStringify } from '../src/core/snapshotSchema.js';
+import {
+  MAX_CANONICAL_DEPTH,
+  canonicalStringify,
+  parseSnapshot,
+} from '../src/core/snapshotSchema.js';
 import type { Config, Finding } from '../src/core/types.js';
 import { docField, elemField, snap } from './helpers/snapshots.js';
 
@@ -360,6 +364,20 @@ describe('filter canonicalisation is not bypassable', () => {
     const left = snap({ fields: a.fields, sampling: { filter: withProto } });
     const right = snap({ fields: a.fields, sampling: { filter: without } });
     expect(diffSnapshots(left, right, cfg()).refusal?.code).toBe('sampling_mismatch');
+  });
+
+  it('survives zod validation: a __proto__ filter key read from a file still refuses', () => {
+    // zod rebuilds a z.record into an object literal, where assigning
+    // `__proto__` hits the prototype setter and the key vanishes.
+    const base = snap({ fields: a.fields });
+    const text = (filter: string): string =>
+      JSON.stringify(base).replace('"filter":{}', `"filter":${filter}`);
+    const left = parseSnapshot(text('{"__proto__":{"status":"paid"},"z":1}'), 'left');
+    const right = parseSnapshot(text('{"z":1}'), 'right');
+
+    expect(Object.getOwnPropertyNames(left.sampling.filter)).toContain('__proto__');
+    expect(diffSnapshots(left, right, cfg()).refusal?.code).toBe('sampling_mismatch');
+    expect(({} as Record<string, unknown>).status).toBeUndefined();
   });
 
   it('refuses a filter nested deeper than MongoDB allows instead of overflowing the stack', () => {

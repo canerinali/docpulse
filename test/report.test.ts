@@ -113,6 +113,23 @@ describe('markdown reporter', () => {
     expect(lines[2]).toContain('wk\\n# OWNED');
   });
 
+  it('does not let a snapshot file write live Markdown into the warning blockquote', () => {
+    const filter = { '<img src=x onerror=alert(1)>': '[click](https://evil.example) **bold**' };
+    const a = snap({
+      fields: [docField('f', { units: 1000, present: 1000, types: { int: 1000 } })],
+      sampling: { filter },
+    });
+    const b = snap({ fields: a.fields, sampling: { filter: {} } });
+    const md = renderMarkdown(diffSnapshots(a, b, DEFAULT_CONFIG, { allowFilterMismatch: true }));
+    const warning = md.split('\n').find((l) => l.startsWith('> **Warning:**')) as string;
+
+    expect(warning).toContain('\\[click\\]');
+    expect(warning).toContain('\\*\\*bold\\*\\*');
+    expect(warning).toContain('\\<img src=x');
+    expect(warning).not.toContain('[click](');
+    expect(warning).not.toContain('**bold**');
+  });
+
   it('escapes a pipe inside a path so the table survives', () => {
     const a = snap({ fields: [docField('we|ird', { units: 1000, present: 900, types: { string: 900 } })] });
     const b = snap({ fields: [docField('we|ird', { units: 1000, present: 100, types: { string: 100 } })] });

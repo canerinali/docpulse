@@ -166,6 +166,27 @@ docpulse snapshot --input-json week38.ndjson -d shop -c orders -o a.json
 docpulse snapshot --input-json week39.ndjson -d shop -c orders -o b.json
 ```
 
+## How `--input-json` reads a file
+
+The form is detected from the first non-whitespace character; there is no flag.
+
+- **NDJSON** (one JSON object per line) is **streamed**. docpulse reads line by
+  line and stops the moment `--sample-size` documents have been yielded, so
+  `-n 1000` against a 40 GB export reads a thousand lines and closes the file.
+  Memory is constant in the size of the input, and there is no size limit.
+- **A `[ … ]` JSON array** is a single JSON value: it cannot be parsed
+  incrementally, so it is read into memory whole and `--sample-size` cannot
+  bound the read. That form is therefore capped at **128 MB**; above it docpulse
+  exits `2` and tells you to convert the file to NDJSON (`jq -c '.[]' in.json >
+  out.ndjson`). A single pretty-printed JSON object counts as this form too.
+
+`estimatedTotalDocs` follows from that. When the whole file was read it is the
+exact document count, with `estimatedTotalDocsMethod: "inputLength"`. When the
+read stopped early at `--sample-size` it is `null`, with
+`estimatedTotalDocsMethod: "inputTruncated"` — counting the rest of the file
+would mean reading the rest of the file, which is the cost `--sample-size`
+exists to avoid.
+
 ## `minSampledDocs`
 
 Default `500`. When a snapshot's `sampledDocs` is below it, every finding is

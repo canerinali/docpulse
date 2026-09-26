@@ -152,7 +152,27 @@ export function validateSnapshot(value: unknown, origin: string): Snapshot {
   if (!result.success) {
     throw new UsageError(`${origin}: not a valid docpulse snapshot`, z.prettifyError(result.error));
   }
-  return result.data as Snapshot;
+
+  const snapshot = result.data as Snapshot;
+  // zod rebuilds a `z.record` into a fresh object literal, and assigning a key
+  // named `__proto__` there hits the `Object.prototype.__proto__` setter, so
+  // the key disappears. `sampling.filter` and `sampling.sort` are what
+  // `diffSnapshots` compares to decide whether two snapshots may be compared at
+  // all, so losing a key there would let two genuinely different samples look
+  // identical. Re-home both onto the canonical (null-prototype) form built from
+  // the raw parsed value, which keeps every key and is what `stringifySnapshot`
+  // writes anyway.
+  const rawSampling = (value as { sampling?: unknown }).sampling;
+  if (rawSampling !== null && typeof rawSampling === 'object') {
+    const raw = rawSampling as { filter?: unknown; sort?: unknown };
+    if (raw.filter !== null && typeof raw.filter === 'object') {
+      snapshot.sampling.filter = canonicalize(raw.filter) as Record<string, unknown>;
+    }
+    if (raw.sort !== null && typeof raw.sort === 'object') {
+      snapshot.sampling.sort = canonicalize(raw.sort) as Record<string, number>;
+    }
+  }
+  return snapshot;
 }
 
 /** Parse and validate snapshot JSON text. */

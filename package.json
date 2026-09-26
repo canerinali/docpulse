@@ -41,6 +41,7 @@
     "examples",
     "docpulse.config.json",
     "README.md",
+    "SECURITY.md",
     "LICENSE"
   ],
   "engines": {

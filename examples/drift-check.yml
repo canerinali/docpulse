@@ -11,6 +11,12 @@ on:
     - cron: '0 6 * * *'
   workflow_dispatch:
 
+# This job holds a database credential and only reads the repository, so give
+# GITHUB_TOKEN the least privilege it can have. Without this block the token
+# inherits the repository default, which on many repositories is still write-all.
+permissions:
+  contents: read
+
 jobs:
   drift:
     runs-on: ubuntu-latest

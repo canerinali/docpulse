@@ -3,12 +3,12 @@
   "collection": "shop.orders",
   "baseline": {
     "label": "week-38",
-    "createdAt": "2026-09-26T17:52:07.895Z",
+    "createdAt": "2026-09-26T18:31:13.932Z",
     "sampledDocs": 600
   },
   "current": {
     "label": "week-39",
-    "createdAt": "2026-09-26T17:52:08.001Z",
+    "createdAt": "2026-09-26T18:31:14.033Z",
     "sampledDocs": 600
   },
   "thresholds": {
