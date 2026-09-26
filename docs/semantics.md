@@ -229,6 +229,11 @@ where.
   a filter containing `$where`, `$function` or `$accumulator` makes the *server*
   run JavaScript. Do not build a `--filter` out of anything you did not write
   yourself, such as a workflow input.
+- **A `__proto__` key in a snapshot's `sampling.filter` is refused.** It is not
+  a field name MongoDB can store, and it is the one key that does not survive
+  JSON validation intact — so a snapshot carrying one could slip past the
+  "different filters" refusal above. `diff` exits `2` on such a file rather than
+  comparing a filter it cannot represent faithfully.
 - **Reports escape the data they print.** Field paths are document keys and BSON
   type names can come from a stored `_bsontype` value, so the Markdown and table
   reporters turn control characters into visible escapes (`\n`) and a literal
