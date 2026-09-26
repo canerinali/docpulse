@@ -1,118 +1,39 @@
-<!-- top:start — first-screen copy; safe to replace this whole block -->
 # docpulse
-
-docpulse turns a MongoDB collection's *observed* field schema into a versioned snapshot.
-It fails your CI build when the next snapshot drifts past thresholds you chose.
-Data-contract testing for schemaless collections — not a schema viewer.
 
 <!-- badges -->
 
-**Install**
+**Data contract testing for schemaless MongoDB collections.**
 
-```bash
-npm install -g docpulse
+docpulse samples a MongoDB collection and writes down the schema your documents *actually* have: which fields
+are present in what share of the sample, which BSON types they take, how often they are null or empty. Then it
+diffs two of those snapshots and, under `--fail-on-drift`, exits nonzero when a drift crosses a threshold you set.
+
+- **You find out the day a field stops being written, not the week a report comes out wrong.** An upstream
+  service quietly drops `customer.taxId` from its payload. Nothing throws, nothing 500s, and the aggregation
+  that reads it just returns fewer rows. docpulse turns that into a failed build on the next CI run.
+- **You are never guessing at the denominator.** Every finding says what it counted and out of how many:
+  `412 of 1000 documents`, or `4098 of 4102 array elements`, tracked separately and never compared against each
+  other. Below `minSampledDocs` (default 500) docpulse downgrades its findings to info and lets the build pass,
+  because a 10-point "drop" in a 50-document sample is noise and a tool that cries wolf gets muted.
+- **It is a test, not a dashboard.** Two commands, a JSON file you commit, and an exit code. No web UI, no
+  agent, no history store, no write access to your database. Three runtime dependencies in total:
+  `commander`, `zod`, `mongodb`.
+
+## Install
+
+```sh
+npm install -g docpulse    # or run it without installing: npx docpulse --help
 ```
 
-**Use**
+## Usage
 
-```bash
-docpulse snapshot -u "$MONGODB_URI" -d shop -c orders -o current.json && docpulse diff baseline.json current.json --fail-on-drift
+```sh
+docpulse snapshot -u "$MONGODB_URI" -d shop -c orders -o today.json && docpulse diff baseline.json today.json --fail-on-drift
 ```
 
-<!-- top:end -->
-
-## The problem
-
-Your `orders` collection has no schema, so nothing tells you when an upstream
-producer quietly starts sending `qty` as a string, stops writing `customer.taxId`,
-or replaces an omitted field with an explicit `null`. You find out weeks later,
-in an aggregation that silently dropped rows.
-
-docpulse makes that a build failure. You commit a baseline snapshot, take a new
-one on a schedule, and `docpulse diff --fail-on-drift` exits non-zero when the
-difference crosses a threshold you wrote down.
-
-## Features
-
-- **Two commands.** `snapshot` samples a collection into a JSON file;
-  `diff` compares two of those files and sets an exit code. That is the whole tool.
-- **Honest denominators.** A ratio is always reported against the population it
-  was measured in: `41.2% of 1000 documents` and `99.9% of 4102 array elements`
-  are different statements, and docpulse never mixes them.
-- **Missing, `null` and `""` are three different things.** They land in three
-  different counters, so "the field stopped being written" and "the field is now
-  explicitly null" are different findings.
-- **Exactly five finding types.** `field_disappeared`, `field_appeared`,
-  `type_changed`, `presence_dropped`, `null_ratio_increased`. Nothing else.
-- **Thresholds you write, in `docpulse.config.json`.** No automatic baseline
-  learning, no magic.
-- **It refuses to compare apples and oranges.** Different query filter, different
-  collection, or different snapshot format version: it exits `2` and tells you
-  why, instead of reporting a presence drop that is really just a narrower query.
-- **It shuts up on small samples.** Below `minSampledDocs` (default 500) every
-  finding is downgraded to `info` and `--fail-on-drift` passes, because at n = 50
-  a 10pp "drop" is indistinguishable from noise.
-- **Read-only, always.** The only MongoDB operations it issues are `find`,
-  `$sample`, `countDocuments` and `estimatedDocumentCount`.
-- **Works with no database at all.** `--input-json` reads a JSON array or NDJSON
-  file, so you can try it, test it, and run it in CI without a `mongod`.
-- **Three runtime dependencies**: `commander`, `zod`, `mongodb`.
-
-## Commands
-
-```
-docpulse snapshot [options]
-
-  -u, --uri <uri>          MongoDB connection string (env: MONGODB_URI)
-  -d, --db <name>          Database name
-  -c, --collection <name>  Collection name (required unless --input-json)
-      --input-json <file>  Read documents from a JSON array or NDJSON file instead of MongoDB
-  -o, --out <file>         Write snapshot here (default: stdout)
-  -n, --sample-size <n>    Max documents to sample (default: 1000)
-      --filter <json>      Query filter, JSON object (default: {})
-      --sort <json>        Sort for deterministic sampling (default: {"_id":-1})
-      --random             Use $sample instead of sort+limit. Unbiased but NOT reproducible.
-      --label <text>       Free-text label stored in the snapshot
-```
-
-```
-docpulse diff [options] <baseline.json> <current.json>
-
-      --config <file>          Config file (default: ./docpulse.config.json if present)
-      --format <fmt>           markdown | json | table (default: markdown)
-  -o, --out <file>             Write report here (default: stdout)
-      --fail-on-drift          Exit 1 if any finding survives the thresholds
-      --allow-filter-mismatch  Downgrade a filter/sampling mismatch from refusal to a warning
-
-Exit codes: 0 = no drift (or drift without --fail-on-drift)
-            1 = drift + --fail-on-drift
-            2 = usage error, invalid/unreadable snapshot, or refused comparison
-```
-
-With `--input-json`, `-d`/`-c` name the *logical* collection the documents belong
-to. Pass the same pair for both files you intend to compare — `diff` refuses to
-compare snapshots of different collections.
-
-## Configuration
-
-`docpulse.config.json` is picked up from the working directory. Every key below
-is the default, and the file is optional:
-
-```json
-{
-  "presenceDropPct": 10,
-  "nullRatioIncreasePct": 10,
-  "minSampledDocs": 500,
-  "minPresenceToTrackPct": 5,
-  "newFieldMinPresencePct": 5,
-  "typeNoiseFloorPct": 1,
-  "treatNumericTypesAsEquivalent": true,
-  "ignorePaths": ["_id", "updatedAt"]
-}
-```
-
-Full semantics — paths, denominators, every finding rule, and what docpulse
-explicitly does *not* guarantee — are in [docs/semantics.md](docs/semantics.md).
+`snapshot` writes the file. `diff` reports only what crosses your thresholds and, with `--fail-on-drift`, exits
+`1` when something does (`0` = clean, or drift without that flag; `2` = bad input or a comparison docpulse
+refuses to make).
 
 ## Try it with no database
 
@@ -218,6 +139,99 @@ of its twelve entries:
   ]
 }
 ```
+
+## The problem
+
+Your `orders` collection has no schema, so nothing tells you when an upstream
+producer quietly starts sending `qty` as a string, stops writing `customer.taxId`,
+or replaces an omitted field with an explicit `null`. You find out weeks later,
+in an aggregation that silently dropped rows.
+
+docpulse makes that a build failure. You commit a baseline snapshot, take a new
+one on a schedule, and `docpulse diff --fail-on-drift` exits non-zero when the
+difference crosses a threshold you wrote down.
+
+## Features
+
+- **Two commands.** `snapshot` samples a collection into a JSON file;
+  `diff` compares two of those files and sets an exit code. That is the whole tool.
+- **Honest denominators.** A ratio is always reported against the population it
+  was measured in: `41.2% of 1000 documents` and `99.9% of 4102 array elements`
+  are different statements, and docpulse never mixes them.
+- **Missing, `null` and `""` are three different things.** They land in three
+  different counters, so "the field stopped being written" and "the field is now
+  explicitly null" are different findings.
+- **Exactly five finding types.** `field_disappeared`, `field_appeared`,
+  `type_changed`, `presence_dropped`, `null_ratio_increased`. Nothing else.
+- **Thresholds you write, in `docpulse.config.json`.** No automatic baseline
+  learning, no magic.
+- **It refuses to compare apples and oranges.** Different query filter, different
+  collection, or different snapshot format version: it exits `2` and tells you
+  why, instead of reporting a presence drop that is really just a narrower query.
+- **It shuts up on small samples.** Below `minSampledDocs` (default 500) every
+  finding is downgraded to `info` and `--fail-on-drift` passes, because at n = 50
+  a 10pp "drop" is indistinguishable from noise.
+- **Read-only, always.** The only MongoDB operations it issues are `find`,
+  `$sample`, `countDocuments` and `estimatedDocumentCount`.
+- **Works with no database at all.** `--input-json` reads a JSON array or NDJSON
+  file, so you can try it, test it, and run it in CI without a `mongod`.
+- **Three runtime dependencies**: `commander`, `zod`, `mongodb`.
+
+## Commands
+
+```
+docpulse snapshot [options]
+
+  -u, --uri <uri>          MongoDB connection string (env: MONGODB_URI)
+  -d, --db <name>          Database name
+  -c, --collection <name>  Collection name (required unless --input-json)
+      --input-json <file>  Read documents from a JSON array or NDJSON file instead of MongoDB
+  -o, --out <file>         Write snapshot here (default: stdout)
+  -n, --sample-size <n>    Max documents to sample (default: 1000)
+      --filter <json>      Query filter, JSON object (default: {})
+      --sort <json>        Sort for deterministic sampling (default: {"_id":-1})
+      --random             Use $sample instead of sort+limit. Unbiased but NOT reproducible.
+      --label <text>       Free-text label stored in the snapshot
+```
+
+```
+docpulse diff [options] <baseline.json> <current.json>
+
+      --config <file>          Config file (default: ./docpulse.config.json if present)
+      --format <fmt>           markdown | json | table (default: markdown)
+  -o, --out <file>             Write report here (default: stdout)
+      --fail-on-drift          Exit 1 if any finding survives the thresholds
+      --allow-filter-mismatch  Downgrade a filter/sampling mismatch from refusal to a warning
+
+Exit codes: 0 = no drift (or drift without --fail-on-drift)
+            1 = drift + --fail-on-drift
+            2 = usage error, invalid/unreadable snapshot, or refused comparison
+```
+
+With `--input-json`, `-d`/`-c` name the *logical* collection the documents belong
+to. Pass the same pair for both files you intend to compare — `diff` refuses to
+compare snapshots of different collections.
+
+## Configuration
+
+`docpulse.config.json` is picked up from the working directory. Every key below
+is the default, and the file is optional:
+
+```json
+{
+  "presenceDropPct": 10,
+  "nullRatioIncreasePct": 10,
+  "minSampledDocs": 500,
+  "minPresenceToTrackPct": 5,
+  "newFieldMinPresencePct": 5,
+  "typeNoiseFloorPct": 1,
+  "treatNumericTypesAsEquivalent": true,
+  "ignorePaths": ["_id", "updatedAt"]
+}
+```
+
+Full semantics — paths, denominators, every finding rule, and what docpulse
+explicitly does *not* guarantee — are in [docs/semantics.md](docs/semantics.md).
 
 ## In CI
 
