@@ -1,0 +1,57 @@
+# Drop this into .github/workflows/ in the repository that owns the collection.
+#
+# It takes a fresh snapshot of a MongoDB collection and fails the build when the
+# schema has drifted past the thresholds in docpulse.config.json. The baseline
+# snapshot is committed to the repo, so "what we consider correct" is reviewed
+# in pull requests like any other contract.
+name: schema drift
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Take a snapshot of today's sample
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI_READONLY }}
+        run: |
+          npx docpulse@0.1 snapshot \
+            --db shop \
+            --collection orders \
+            --sample-size 5000 \
+            --label "prod-$(date -u +%Y-%m-%d)" \
+            --out current.snapshot.json
+
+      - name: Fail if the schema drifted past the thresholds
+        run: |
+          npx docpulse@0.1 diff \
+            contracts/orders.baseline.json \
+            current.snapshot.json \
+            --format markdown \
+            --out drift-report.md \
+            --fail-on-drift
+
+      # Always publish the report, including on failure, so the drift is
+      # visible without re-running anything.
+      - name: Publish the drift report
+        if: always()
+        run: cat drift-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the snapshot as a build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docpulse-snapshot
+          path: |
+            current.snapshot.json
+            drift-report.md

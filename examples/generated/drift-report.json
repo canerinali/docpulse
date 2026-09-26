@@ -1,0 +1,139 @@
+{
+  "tool": "docpulse@0.1.0",
+  "collection": "shop.orders",
+  "baseline": {
+    "label": "week-38",
+    "createdAt": "2026-09-26T17:52:07.895Z",
+    "sampledDocs": 600
+  },
+  "current": {
+    "label": "week-39",
+    "createdAt": "2026-09-26T17:52:08.001Z",
+    "sampledDocs": 600
+  },
+  "thresholds": {
+    "presenceDropPct": 10,
+    "nullRatioIncreasePct": 10,
+    "minSampledDocs": 500,
+    "minPresenceToTrackPct": 5,
+    "newFieldMinPresencePct": 5,
+    "typeNoiseFloorPct": 1,
+    "treatNumericTypesAsEquivalent": true,
+    "ignorePaths": [
+      "_id",
+      "updatedAt"
+    ]
+  },
+  "lowSample": false,
+  "refusal": null,
+  "warnings": [],
+  "summary": {
+    "findings": 5,
+    "error": 3,
+    "warning": 2,
+    "info": 0,
+    "suppressed": 2
+  },
+  "findings": [
+    {
+      "type": "field_disappeared",
+      "severity": "error",
+      "path": "couponCode",
+      "change": "63.3% → absent",
+      "sample": "600 → 600 documents",
+      "suggestedAction": "The field is absent from the whole sample. Confirm the producer was retired on purpose, then re-baseline.",
+      "metrics": {
+        "baselinePresenceRatio": 0.6333333333333333,
+        "currentPresenceRatio": 0,
+        "presenceDropPp": 63.33333333333333,
+        "baselineTypes": [
+          "string"
+        ],
+        "currentTypes": [],
+        "baselineObservedUnits": 600,
+        "currentObservedUnits": 600
+      }
+    },
+    {
+      "type": "type_changed",
+      "severity": "error",
+      "path": "lines.items[].qty",
+      "change": "number → number, string",
+      "sample": "1200 → 1200 array elements",
+      "suggestedAction": "A producer is sending numbers as strings; find it before your aggregations silently drop rows.",
+      "metrics": {
+        "baselineTypes": [
+          "number"
+        ],
+        "currentTypes": [
+          "number",
+          "string"
+        ],
+        "baselineDenominator": "arrayElements",
+        "currentDenominator": "arrayElements",
+        "baselineObservedUnits": 1200,
+        "currentObservedUnits": 1200
+      }
+    },
+    {
+      "type": "presence_dropped",
+      "severity": "error",
+      "path": "customer.taxId",
+      "change": "75.0% → 20.0% (-55.0pp)",
+      "sample": "600 → 600 documents",
+      "suggestedAction": "Confirm the field is still being written; if it was intentionally retired, re-baseline.",
+      "metrics": {
+        "baselinePresenceRatio": 0.75,
+        "currentPresenceRatio": 0.2,
+        "presenceDropPp": 55.00000000000001,
+        "baselineObservedUnits": 600,
+        "currentObservedUnits": 600
+      }
+    },
+    {
+      "type": "field_appeared",
+      "severity": "warning",
+      "path": "channel",
+      "change": "absent → 100.0%",
+      "sample": "600 → 600 documents",
+      "suggestedAction": "A field you have no contract for is being written. Add it to the contract, or to ignorePaths.",
+      "metrics": {
+        "baselinePresenceRatio": 0,
+        "currentPresenceRatio": 1,
+        "baselineTypes": [],
+        "currentTypes": [
+          "string"
+        ],
+        "baselineObservedUnits": 600,
+        "currentObservedUnits": 600
+      }
+    },
+    {
+      "type": "null_ratio_increased",
+      "severity": "warning",
+      "path": "paymentProvider",
+      "change": "2.0% → 30.0% null of present (+28.0pp)",
+      "sample": "600 → 600 documents",
+      "suggestedAction": "Upstream is writing nulls instead of omitting the field; decide which contract you want.",
+      "metrics": {
+        "baselineNullRatio": 0.02,
+        "currentNullRatio": 0.3,
+        "nullRatioIncreasePp": 27.999999999999996,
+        "baselineObservedUnits": 600,
+        "currentObservedUnits": 600
+      }
+    }
+  ],
+  "suppressed": [
+    {
+      "path": "_id",
+      "reason": "ignored",
+      "detail": "matched ignorePaths"
+    },
+    {
+      "path": "updatedAt",
+      "reason": "ignored",
+      "detail": "matched ignorePaths"
+    }
+  ]
+}

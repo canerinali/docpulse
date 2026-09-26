@@ -1,0 +1,155 @@
+{
+  "formatVersion": 1,
+  "tool": "docpulse@0.1.0",
+  "label": "week-39",
+  "createdAt": "2026-09-26T17:52:08.001Z",
+  "collection": "shop.orders",
+  "sampling": {
+    "mode": "input-file",
+    "sampleSize": 1000,
+    "filter": {},
+    "sort": null
+  },
+  "sampledDocs": 600,
+  "estimatedTotalDocs": 600,
+  "estimatedTotalDocsMethod": "inputLength",
+  "fields": [
+    {
+      "path": "_id",
+      "denominator": "documents",
+      "observedUnits": 600,
+      "presentCount": 600,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "int": 600
+      }
+    },
+    {
+      "path": "channel",
+      "denominator": "documents",
+      "observedUnits": 600,
+      "presentCount": 600,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "string": 600
+      }
+    },
+    {
+      "path": "customer",
+      "denominator": "documents",
+      "observedUnits": 600,
+      "presentCount": 600,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "object": 600
+      }
+    },
+    {
+      "path": "customer.taxId",
+      "denominator": "documents",
+      "observedUnits": 600,
+      "presentCount": 120,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "string": 120
+      }
+    },
+    {
+      "path": "lines",
+      "denominator": "documents",
+      "observedUnits": 600,
+      "presentCount": 600,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "array": 600
+      }
+    },
+    {
+      "path": "lines.items[]",
+      "denominator": "arrayElements",
+      "arrayParent": "lines",
+      "observedUnits": 1200,
+      "presentCount": 1200,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "object": 1200
+      }
+    },
+    {
+      "path": "lines.items[].qty",
+      "denominator": "arrayElements",
+      "arrayParent": "lines",
+      "observedUnits": 1200,
+      "presentCount": 1200,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "int": 600,
+        "string": 600
+      }
+    },
+    {
+      "path": "lines.items[].sku",
+      "denominator": "arrayElements",
+      "arrayParent": "lines",
+      "observedUnits": 1200,
+      "presentCount": 1200,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "string": 1200
+      }
+    },
+    {
+      "path": "paymentProvider",
+      "denominator": "documents",
+      "observedUnits": 600,
+      "presentCount": 600,
+      "nullCount": 180,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "null": 180,
+        "string": 420
+      }
+    },
+    {
+      "path": "status",
+      "denominator": "documents",
+      "observedUnits": 600,
+      "presentCount": 600,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "string": 600
+      }
+    },
+    {
+      "path": "total",
+      "denominator": "documents",
+      "observedUnits": 600,
+      "presentCount": 600,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "int": 600
+      }
+    },
+    {
+      "path": "updatedAt",
+      "denominator": "documents",
+      "observedUnits": 600,
+      "presentCount": 600,
+      "nullCount": 0,
+      "emptyStringCount": 0,
+      "bsonTypes": {
+        "string": 600
+      }
+    }
+  ]
+}
