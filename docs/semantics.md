@@ -213,9 +213,11 @@ where.
 - **Your `--filter` is stored verbatim** in the snapshot's `sampling.filter`,
   and printed in full when `diff` refuses a filter mismatch. That is deliberate:
   a presence drop caused by a narrower query is not drift, so the filter has to
-  travel with the snapshot. It also means a filter that matches on an e-mail
-  address, an account identifier or anything else you would not put in git ends
-  up in git. Filter on non-sensitive fields, or accept that the value is public.
+  travel with the snapshot. A snapshot is also meant to be committed — that is
+  the whole workflow — so the value you filtered on ends up in your repository
+  and in its history, permanently. **Do not filter on secret values.** A filter
+  that matches on an API token, an e-mail address, an account identifier or
+  anything else you would not put in git belongs nowhere near `--filter`.
 - **Your connection string is never stored or printed.** It is not written to
   the snapshot, not written to any report, and not included in the error
   docpulse prints when a connection fails — only the driver's own message is
