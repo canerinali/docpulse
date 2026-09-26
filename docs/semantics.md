@@ -218,10 +218,13 @@ where.
   up in git. Filter on non-sensitive fields, or accept that the value is public.
 - **Your connection string is never stored or printed.** It is not written to
   the snapshot, not written to any report, and not included in the error
-  docpulse prints when a connection fails — only the driver's own (credential-
-  free) message is shown. It is, however, visible in `ps` output and in your
-  shell history when you pass it as `--uri`, so prefer the `MONGODB_URI`
-  environment variable, and a CI secret in a pipeline.
+  docpulse prints when a connection fails — only the driver's own message is
+  shown, and docpulse redacts `mongodb://user:password@` out of that message
+  itself rather than trusting the driver to have done it. The string is,
+  however, visible in `ps` output and in your shell history when you pass it as
+  `--uri`, so prefer the `MONGODB_URI` environment variable, `--uri-file <path>`
+  (a mounted secret; docpulse reads one line and trims the trailing newline), and
+  a CI secret in a pipeline.
 - **`--filter` is passed to MongoDB unchanged.** docpulse issues only reads, but
   a filter containing `$where`, `$function` or `$accumulator` makes the *server*
   run JavaScript. Do not build a `--filter` out of anything you did not write

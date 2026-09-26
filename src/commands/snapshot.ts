@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { UsageError } from '../errors.js';
 import { inferFromSource } from '../core/infer.js';
 import { stringifySnapshot } from '../core/snapshotSchema.js';
@@ -7,6 +7,7 @@ import type { DocumentSource, Snapshot } from '../core/types.js';
 
 export interface SnapshotOptions {
   uri?: string | undefined;
+  uriFile?: string | undefined;
   db?: string | undefined;
   collection?: string | undefined;
   inputJson?: string | undefined;
@@ -71,11 +72,57 @@ export function parseSamplingFlags(options: SnapshotOptions): {
   };
 }
 
+/**
+ * Work out the connection string, in order of preference.
+ *
+ * `--uri-file` exists because an argument is not private: on Linux
+ * `/proc/<pid>/cmdline` is world-readable, so `-u "$MONGODB_URI"` hands the
+ * database password to every other user on the machine for as long as the
+ * process runs, and leaves it in the shell history besides. A file is how
+ * Docker and Kubernetes mount a secret, and it never touches `argv`.
+ */
+export async function resolveUri(options: SnapshotOptions): Promise<string | undefined> {
+  if (options.uriFile === undefined || options.uriFile === '') {
+    return options.uri ?? process.env.MONGODB_URI;
+  }
+  if (options.uri !== undefined) {
+    throw new UsageError('--uri-file cannot be combined with --uri');
+  }
+
+  let text: string;
+  try {
+    text = await readFile(options.uriFile, 'utf8');
+  } catch (error) {
+    throw new UsageError(
+      `cannot read --uri-file: ${options.uriFile}`,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+
+  const uri = text.trim();
+  if (uri === '') {
+    throw new UsageError(
+      `--uri-file is empty: ${options.uriFile}`,
+      'The file must hold the connection string and nothing else.',
+    );
+  }
+  if (/[\r\n]/.test(uri)) {
+    throw new UsageError(
+      `--uri-file must hold one line: ${options.uriFile}`,
+      'The file must hold the connection string and nothing else. A trailing newline is fine.',
+    );
+  }
+  return uri;
+}
+
 /** Build the right {@link DocumentSource} for the given flags. */
 export async function createSource(options: SnapshotOptions): Promise<DocumentSource> {
   if (options.inputJson !== undefined) {
     if (options.uri !== undefined) {
       throw new UsageError('--uri cannot be combined with --input-json');
+    }
+    if (options.uriFile !== undefined) {
+      throw new UsageError('--uri-file cannot be combined with --input-json');
     }
     if (options.random === true) {
       throw new UsageError('--random applies to MongoDB sampling only, not --input-json');
@@ -93,11 +140,12 @@ export async function createSource(options: SnapshotOptions): Promise<DocumentSo
     );
   }
 
-  const uri = options.uri ?? process.env.MONGODB_URI;
+  const uri = await resolveUri(options);
   if (uri === undefined || uri === '') {
     throw new UsageError(
       'a MongoDB connection string is required',
-      'Pass --uri, set MONGODB_URI, or read local documents with --input-json <file>.',
+      'Set MONGODB_URI, pass --uri-file <path>, or read local documents with --input-json <file>. ' +
+        '(--uri works too, but it is visible in the process list.)',
     );
   }
   if (options.db === undefined || options.db === '') {
