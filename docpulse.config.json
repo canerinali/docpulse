@@ -1,0 +1,10 @@
+{
+  "presenceDropPct": 10,
+  "nullRatioIncreasePct": 10,
+  "minSampledDocs": 500,
+  "minPresenceToTrackPct": 5,
+  "newFieldMinPresencePct": 5,
+  "typeNoiseFloorPct": 1,
+  "treatNumericTypesAsEquivalent": true,
+  "ignorePaths": ["_id", "updatedAt"]
+}
