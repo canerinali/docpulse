@@ -1,5 +1,6 @@
 import { MongoClient, type Document, type Sort } from 'mongodb';
 import { UsageError } from '../errors.js';
+import { redactConnectionStrings } from '../redact.js';
 import type { DocumentSource, SamplingInfo } from '../core/types.js';
 
 export interface MongoSourceOptions {
@@ -51,9 +52,11 @@ export class MongoDocumentSource implements DocumentSource {
       this.#client = await MongoClient.connect(this.#options.uri);
       this.#ownsClient = true;
     } catch (error) {
+      // The driver redacts its own messages today. This does not depend on it:
+      // `mongodb` is a caret range, and this text goes to a CI log.
       throw new UsageError(
         `cannot connect to MongoDB`,
-        error instanceof Error ? error.message : String(error),
+        redactConnectionStrings(error instanceof Error ? error.message : String(error)),
       );
     }
     return this.#client;

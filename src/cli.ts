@@ -3,6 +3,7 @@ import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import { DocpulseError } from './errors.js';
+import { redactConnectionStrings } from './redact.js';
 import { runDiff, type DiffOptions } from './commands/diff.js';
 import { runSnapshot, type SnapshotOptions } from './commands/snapshot.js';
 import { VERSION } from './version.js';
@@ -124,7 +125,9 @@ export async function main(argv: string[] = process.argv): Promise<number> {
     if (typeof commanderExit === 'number') {
       return commanderExit === 0 ? 0 : 2;
     }
-    process.stderr.write(`docpulse: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.stderr.write(
+      `docpulse: ${redactConnectionStrings(error instanceof Error ? error.message : String(error))}\n`,
+    );
     return 2;
   }
 }
@@ -155,7 +158,9 @@ if (invokedDirectly) {
       process.exitCode = code;
     },
     (error: unknown) => {
-      process.stderr.write(`docpulse: ${error instanceof Error ? error.stack : String(error)}\n`);
+      process.stderr.write(
+        `docpulse: ${redactConnectionStrings(error instanceof Error ? (error.stack ?? error.message) : String(error))}\n`,
+      );
       process.exitCode = 2;
     },
   );
