@@ -227,10 +227,14 @@ where.
   `--uri`, so prefer the `MONGODB_URI` environment variable, `--uri-file <path>`
   (a mounted secret; docpulse reads one line and trims the trailing newline), and
   a CI secret in a pipeline.
-- **`--filter` is passed to MongoDB unchanged.** docpulse issues only reads, but
-  a filter containing `$where`, `$function` or `$accumulator` makes the *server*
-  run JavaScript. Do not build a `--filter` out of anything you did not write
-  yourself, such as a workflow input.
+- **`--filter` is passed to MongoDB unchanged, minus three refusals.** docpulse
+  issues only reads, but a filter containing `$where`, `$function` or
+  `$accumulator` makes the *server* run JavaScript. docpulse therefore refuses
+  those three operators — anywhere in `--filter` or `--sort`, including nested
+  inside `$or`/`$and` — and exits `2` unless you pass `--allow-server-js`.
+  Everything else in the filter reaches the driver exactly as you typed it, so
+  do not build a `--filter` out of anything you did not write yourself, such as
+  a workflow input.
 - **A `__proto__` key in a snapshot's `sampling.filter` is refused.** It is not
   a field name MongoDB can store, and it is the one key that does not survive
   JSON validation intact — so a snapshot carrying one could slip past the

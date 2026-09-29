@@ -250,8 +250,10 @@ to. Pass the same pair for both files you intend to compare — `diff` refuses t
 compare snapshots of different collections.
 
 The connection string is resolved in this order: `--uri-file`, then `--uri`,
-then `MONGODB_URI`. `--uri-file` reads one line from a file and trims the
-trailing newline, so a Docker or Kubernetes secret works unmodified:
+then `MONGODB_URI`. Passing both `--uri-file` and `--uri` is not a precedence
+question but an error — docpulse exits `2` rather than guess which one you
+meant. `--uri-file` reads one line from a file and trims the trailing newline,
+so a Docker or Kubernetes secret works unmodified:
 
 ```sh
 docpulse snapshot --uri-file /run/secrets/mongodb-uri -d shop -c orders -o today.json

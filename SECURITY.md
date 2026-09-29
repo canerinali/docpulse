@@ -93,11 +93,13 @@ account and no telemetry, which makes the scope fairly narrow.
 - **What the operator asks for.** `--filter`, `--uri`, `--out`, `--config` and
   the two snapshot paths are the operator's own arguments. Reading a file you
   named, writing a file you named, or running a query you typed is not a
-  vulnerability, including a `--filter` containing `$where`. See
+  vulnerability — including a `--filter` containing `$where`, which docpulse
+  refuses by default but will run if you pass `--allow-server-js`. See
   "Handling untrusted data" in [docs/semantics.md](docs/semantics.md).
 - **A connection string visible in `ps` output or shell history** when you pass
-  it as `--uri`. That is inherent to command-line arguments; use the
-  `MONGODB_URI` environment variable or a CI secret.
+  it as `--uri`. That is inherent to command-line arguments, which is why it is
+  not the documented path; use the `MONGODB_URI` environment variable,
+  `--uri-file <path>`, or a CI secret.
 - **Values you put in a `--filter` ending up in the snapshot.** The filter is
   stored on purpose so `diff` can refuse to compare mismatched samples. It is
   documented; choose filter fields accordingly.
@@ -117,7 +119,9 @@ account and no telemetry, which makes the scope fairly narrow.
 - Give docpulse a **read-only MongoDB user**. It never needs more, and a
   read-only user turns the "it never writes" claim into something your database
   enforces rather than something you have to trust.
-- Pass the connection string through `MONGODB_URI` (a CI secret), not `--uri`.
+- Pass the connection string through `MONGODB_URI` (a CI secret) or
+  `--uri-file <path>` (a mounted secret), not `--uri`. Both keep it out of
+  `argv`, where any other user on the machine can read it.
 - Snapshots and reports are build artefacts derived from your data. Review a
   snapshot before committing it the same way you would review any other file
   that goes into git: the field *names* of your collection are in it.

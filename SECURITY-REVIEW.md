@@ -18,17 +18,38 @@ metadata, the resolved dependency tree, and the git history of all commits.
 v22.23.2) against crafted hostile inputs, a network tripwire, and a throwaway
 authenticated `mongo:7` container.
 
-| Severity | Count | Fixed here | Left as recommendation |
+| Severity | Count | Fixed | Still open |
 |---|---|---|---|
 | Critical | 0 | — | — |
 | High | 1 | 1 | 0 |
-| Medium | 4 | 2 | 2 |
-| Low | 5 | 3 | 2 |
-| Informational | 9 | 2 | 7 |
+| Medium | 4 | 4 | 0 |
+| Low | 5 | 4 | 1 |
+| Informational | 9 | 3 (+1 partial) | 5 |
 
-`npm audit` is clean, `npm run check` is green (134 passed / 2 skipped without a
-database; 136 with one), and the example still produces byte-identical output
-apart from `createdAt`.
+`npm audit` is clean, `npm run check` is green (185 passed / 2 skipped without a
+database; 187 passed with one), and the example still produces byte-identical
+output apart from `createdAt`.
+
+### Reconciliation pass — 2026-09-29
+
+The counts above are **not** the ones this review shipped with. Six commits
+landed after it was written, and every finding was re-verified against the built
+CLI on 2026-09-29 (Node v22.23.2, a throwaway authenticated `mongo:7`
+container). What changed:
+
+| Finding | Status in the original review | Verified status, 2026-09-29 | What changed it |
+|---|---|---|---|
+| M-2 | documented only | **fixed** | `059cdd8` — `--uri-file`, env-var-first help and README |
+| M-3 | recommendation, not fixed | **fixed** | `52ff331` — NDJSON is streamed; the array form is capped |
+| L-4 | documented | **still open, by design** | `ff89605` added the README warning; the behaviour is unchanged and deliberate |
+| L-5 | documented, guard not added | **fixed** | `ecec2e9` — `$where`/`$function`/`$accumulator` refused by default |
+| I-8 | recommendation | **fixed** | `52ff331` — `LAUNCH.md` gitignored; absent from `main`'s history |
+| I-9 | not applied | **partially fixed** | `630a2ae` — audit step, Dependabot, exact `npx` pin; actions still tag-pinned, no provenance |
+
+H-1, M-1, M-4, L-1, L-2 and L-3 were re-tested against the current build and are
+still fixed; the per-finding notes below record the evidence. The later commits
+use their own numbering (`MEDIUM-2`, `LOW-1`…`LOW-5`) which does **not** line up
+with the `M-`/`L-` numbers in this document — the table above is the mapping.
 
 ---
 
@@ -142,6 +163,15 @@ that character.
 key", "sanitises a label, a collection name and a BSON type name from a
 snapshot file", "keeps its columns when a document key contains a newline".
 
+> **Re-verified 2026-09-29: still fixed.** The same hostile key, replayed
+> through the current build (`--input-json` → `diff`), produced an 8-line report
+> whose only `#` line is docpulse's own `# docpulse drift report`, two table rows
+> in total, and the whole payload contained in one cell on one line:
+>
+> ```markdown
+> | 1 | `field_appeared` | `ok\u0060\n\n## INJECTED HEADING\n\n<img src=x onerror=alert(1)>\n\n\| 1 \| …\n\nbenign` | absent → 100.0% | 600 → 600 documents | … |
+> ```
+
 ---
 
 ## Medium
@@ -200,7 +230,12 @@ yields `payload : object`, `payload._bsontype : string`,
 stored in a plain document object". Documented in `docs/semantics.md` §BSON
 types.
 
-### M-2 — The connection string is passed through `argv`, where any local user can read it *(documented; one README change left to its owner)*
+> **Re-verified 2026-09-29: still fixed.** 600 documents of
+> `{"safe":1,"payload":{"_bsontype":"ObjectId","hiddenNewField":42}}` snapshot to
+> `payload -> {"object":600}`, `payload._bsontype -> {"string":600}`,
+> `payload.hiddenNewField -> {"int":600}`. Nothing is hidden.
+
+### M-2 — The connection string is passed through `argv`, where any local user can read it *(FIXED)*
 
 **Where:** `src/cli.ts:41` (`-u, --uri <uri>`), `src/commands/snapshot.ts:96`,
 and the headline example in `README.md`.
@@ -239,7 +274,30 @@ mounts. Note the tension a maintainer should settle: `SECURITY.md` declares this
 out of scope — defensible for a CLI — while the README still teaches the form
 that causes it.
 
-### M-3 — `--input-json` reads and parses the whole file regardless of `--sample-size` *(recommendation, not fixed)*
+> **Status as of 2026-09-29: fixed** by `059cdd8` "MEDIUM-2: keep the connection
+> string out of argv". Everything this review left for the author was done.
+> `src/commands/snapshot.ts:145-177` adds `resolveUri()` with a `--uri-file
+> <path>` that reads one line from a secret mount and refuses to combine with
+> `--uri`; `src/cli.ts:42-51` rewrites the `--uri` help to "Prefer the MONGODB_URI
+> env var or --uri-file"; `src/commands/snapshot.ts:206-210` makes the
+> "connection string is required" error name the safe paths first; and
+> `README.md:39-50` now leads with `export MONGODB_URI=…`.
+>
+> Measured again on this host, against a live `mongo:7`:
+>
+> ```
+> env-var path:   cmdline = "node …/docpulse snapshot -d shop -c orders -o /dev/null"
+>                 secret readable in /proc/<pid>/cmdline: 0   ps sees it: 0
+> --uri-file:     secret readable in /proc/<pid>/cmdline: 0
+> --uri:          secret readable in /proc/<pid>/cmdline: 1   (unchanged, on purpose)
+> ```
+>
+> **Residual, accepted:** `--uri` still exists and still puts the string in
+> `argv`. That is the point of an escape hatch, and it is now the only path the
+> help text argues against. Regression tests: `test/uriFile.test.ts`,
+> `test/cli.test.ts`.
+
+### M-3 — `--input-json` reads and parses the whole file regardless of `--sample-size` *(FIXED)*
 
 **Where:** `src/source/arraySource.ts:134` (`readFile(file, 'utf8')`) and
 `:141` (`parseDocumentsText`), with the limit applied only afterwards at
@@ -279,6 +337,36 @@ the accumulator as they parse and stopping at `sampleSize`; `DocumentSource` is
 already an `AsyncIterable`, so it is a drop-in change behind `createFileSource`.
 Keep the whole-file `JSON.parse` only for the JSON-array form. As a stop-gap,
 `stat()` the file and refuse above a documented size with an actionable message.
+
+> **Status as of 2026-09-29: fixed** by `52ff331`, and along exactly the lines
+> recommended above. `src/source/arraySource.ts:134-212` adds
+> `NdjsonDocumentSource`, which drives the file through `createReadStream` +
+> `readline` and destroys the handle the moment `sampleSize` documents have been
+> yielded; `:251-280` sniffs the form from the first 64 KiB; `:227` caps the
+> unavoidable JSON-array form at `MAX_BUFFERED_INPUT_BYTES = 128 MiB` with the
+> actionable `jq -c '.[]'` message.
+>
+> **Measured again**, on a freshly generated 70 MB / 200 000-document NDJSON
+> file (the review's own case was 65 MB / 200 000):
+>
+> ```
+> -n 1        exit 0 | peak RSS  66 MB | elapsed  109ms   (was: 355 MB / 696ms)
+> -n 200000   exit 0 | peak RSS 124 MB | elapsed 1461ms
+> ```
+>
+> and the `-n 1` snapshot reports `estimatedTotalDocs: null` with
+> `estimatedTotalDocsMethod: "inputTruncated"` — the file was *not* read to the
+> end. The 540 MB case that previously died with `Invalid string length` now
+> works: a 559 MB NDJSON file with `-n 1` exits 0 at a 66 MB peak in 101ms. The
+> array form above the cap fails closed with the documented message:
+>
+> ```
+> $ docpulse snapshot --input-json big.json -d s -c o -n 1 -o /dev/null
+> docpulse: --input-json file is too large to read as a JSON array: big.json (154.9 MB, limit 128.0 MB)
+> (exit 2)
+> ```
+>
+> Regression tests: `test/fileSource.test.ts`.
 
 ### M-4 — A snapshot file can still write live Markdown into the warning blockquote *(FIXED)*
 
@@ -321,6 +409,19 @@ only, which is the whole risk in a terminal).
 **Regression test:** `test/report.test.ts` — "does not let a snapshot file write
 live Markdown into the warning blockquote".
 
+> **Re-verified 2026-09-29: still fixed.** A snapshot file whose
+> `sampling.filter` is
+> `{"<img src=x onerror=alert(1)>":"[click me](https://evil.example) **bold** ## heading"}`,
+> diffed with `--allow-filter-mismatch` against the current build, renders inert:
+>
+> ```markdown
+> > **Warning:** … baseline: mode=sort-limit filter=`{}` \| current: mode=sort-limit filter=`{"\<img src=x onerror=alert(1)\>":"\[click me\](https://evil.example) \*\*bold\*\* ## heading"}`
+> ```
+>
+> `3666173` later moved the filters into a code span as well
+> (`src/core/diff.ts:216-225`, `src/report/markdown.ts:38-57`), so the text is
+> now both span-wrapped *and* prose-escaped.
+
 ---
 
 ## Low
@@ -362,6 +463,12 @@ hence Low.
 
 **Regression test:** `test/diff.test.ts` — "keeps a key literally named
 `__proto__` instead of swallowing it".
+
+> **Re-verified 2026-09-29: still fixed.** `src/core/snapshotSchema.ts:93` still
+> builds with `Object.create(null)`, and against the current build
+> `canonicalStringify({"__proto__":{"evil":1},"status":"paid"})` →
+> `{"__proto__":{"evil":1},"status":"paid"}` vs `{"status":"paid"}`,
+> `identical? false`.
 
 ### L-2 — zod dropped the same key again when a snapshot was read from disk *(FIXED)*
 
@@ -407,6 +514,22 @@ from a `bsonTypes` record in a hand-edited snapshot, which could mask a
 only from real BSON classes, a bounded set — so it was left alone rather than
 widen the change. Worth a line in a future pass.
 
+> **Re-verified 2026-09-29: still fixed, and since hardened — so the output
+> quoted above has changed.** `93ba71a` "LOW-5: refuse a snapshot whose
+> sampling.filter has a `__proto__` key" added `hasProtoKey()`
+> (`src/core/snapshotSchema.ts:108-124`) and a refusal at `:181-194`, on the
+> reasoning that `__proto__` is not a field name MongoDB can store, so any
+> snapshot carrying one was hand-edited. The re-homing fix described above is
+> still in place at `:196-214`. A snapshot file whose filter is
+> `{"__proto__":{"status":"paid"},"z":1}` therefore no longer reaches the
+> `sampling_mismatch` refusal quoted above; it is rejected earlier:
+>
+> ```
+> docpulse: proto.json: sampling.filter contains a __proto__ key
+> (exit 2)
+> Object.prototype.status after the run: undefined   # still no prototype pollution
+> ```
+
 ### L-3 — A deeply nested `sampling.filter` crashed `diff` with a bare stack overflow *(FIXED)*
 
 **Where (at `3994e50`):** `src/core/snapshotSchema.ts:70-79` — `canonicalize`
@@ -437,7 +560,11 @@ A snapshot's sampling.filter cannot be nested deeper than MongoDB allows.
 **Regression test:** `test/diff.test.ts` — "refuses a filter nested deeper than
 MongoDB allows instead of overflowing the stack".
 
-### L-4 — `--filter` is persisted verbatim into a file the docs tell you to commit *(documented)*
+> **Re-verified 2026-09-29: still fixed.** Against the current build, a snapshot
+> whose `sampling.filter` nests 2 000 / 10 000 / 50 000 deep all exit 2 with
+> `docpulse: nested more than 100 levels deep`; depth 50 still compares normally.
+
+### L-4 — `--filter` is persisted verbatim into a file the docs tell you to commit *(OPEN — documented, by design)*
 
 **Where:** `src/source/mongoSource.ts:39` → `src/core/infer.ts:170` →
 `src/core/snapshotSchema.ts:95`, and reprinted by `src/core/diff.ts:206-207`
@@ -463,7 +590,27 @@ plainly, and `SECURITY.md` lists it as out of scope with the same explanation.
 mode that stores a hash of the canonical filter, since `diff` only ever compares
 it for equality.
 
-### L-5 — `--filter` reaches MongoDB unvalidated, so `$where` runs server-side JavaScript *(documented, guard not added)*
+> **Status as of 2026-09-29: still open, and deliberately so.** The behaviour is
+> unchanged; `ff89605` "LOW-4: say that the snapshot records the filter and is
+> committed" only widened the documentation, adding the warning to
+> `README.md:159-164` so a reader meets it on the first screen rather than only
+> in `docs/semantics.md:213-220` and `SECURITY.md:101-103`.
+>
+> Re-measured against a live `mongo:7`:
+>
+> ```
+> $ docpulse snapshot -d shop -c orders --filter '{"apiToken":"sk-live-LEAKME"}' -n 600 -o filtered.json
+> exit=0
+> sampling = {"mode":"sort-limit","sampleSize":600,"filter":{"apiToken":"sk-live-LEAKME"},"sort":{"_id":-1}}
+> grep -c sk-live-LEAKME filtered.json -> 1
+> ```
+>
+> and `diff` reprints it in the refusal, exactly as described above. Do not read
+> the `--filter` guard added for L-5 as a fix for this one: it rejects
+> server-side JavaScript, not secrets. `--filter-digest` remains the honest fix
+> if this ever becomes a complaint.
+
+### L-5 — `--filter` reaches MongoDB unvalidated, so `$where` runs server-side JavaScript *(FIXED)*
 
 **Where:** `src/commands/snapshot.ts:36-50` (`parseJsonObjectFlag` checks only
 "is this a JSON object"), `src/source/mongoSource.ts:76` (`.find(filter)`),
@@ -500,6 +647,31 @@ tool's contract. Documented in `docs/semantics.md` and `SECURITY.md` instead.
 those three operators with a clear error and an `--allow-server-side-js` escape
 hatch, and add "run docpulse with a user holding only `read`" to the README.
 
+> **Status as of 2026-09-29: fixed** by `ecec2e9` "LOW-3: refuse $where /
+> $function / $accumulator in --filter" — the recommendation above, taken
+> verbatim except that the flag is spelled `--allow-server-js`.
+> `src/commands/snapshot.ts:44` names the three operators,
+> `:54-70` (`findServerJsOperator`) scans for them iteratively — so a deeply
+> nested filter cannot overflow the stack the way L-3 did — and `:98-109` raises
+> a `UsageError`. `src/cli.ts:74-78` adds the escape hatch, and the error text
+> carries this review's "run docpulse as a user that holds only `read`" advice.
+> The guard covers `--sort` as well as `--filter`.
+>
+> Re-measured against a live `mongo:7`:
+>
+> ```
+> $ docpulse snapshot -d shop -c orders --filter '{"$where":"sleep(1); return true"}' -n 3 -o where.json
+> docpulse: --filter: $where runs JavaScript on the MongoDB server
+> (exit 2, no snapshot file written)
+>
+> nested in $or:              --filter '{"$or":[{"a":1},{"b":{"$function":{"body":"x"}}}]}'  -> refused, exit 2
+> nested inside an array:     --filter '{"a":{"b":[{"c":{"$accumulator":{}}}]}}'             -> refused, exit 2
+> in --sort:                  --sort   '{"$where":"1"}'                                     -> refused, exit 2
+> with --allow-server-js:     the server runs it, sampledDocs 3                             -> exit 0
+> ```
+>
+> Regression tests: `test/filterFlag.test.ts`, `test/cli.test.ts`.
+
 ---
 
 ## Informational
@@ -511,8 +683,9 @@ hatch, and add "run docpulse with a user holding only `read`" to the README.
   repositories that hold a production database credential, so the default
   propagates. Both now declare `permissions: contents: read` at workflow level.
 - **I-2 — `SECURITY.md` was not in the published tarball *(FIXED)*.** Added to
-  `files` in `package.json`; `npm pack --dry-run` now lists it (93 files,
-  85.6 kB).
+  `files` in `package.json`; `npm pack --dry-run` lists it. *(2026-09-29: the
+  tarball is now 98 files / 157.6 kB packed, 603.3 kB unpacked — `docs/demo.gif`
+  was added to the README since.)*
 - **I-3 — `npm audit` is clean, and so are registry signatures.** Verbatim
   output below; `npm audit signatures` reports 56/56 verified signatures and 25
   attestations.
@@ -538,11 +711,15 @@ hatch, and add "run docpulse with a user holding only `read`" to the README.
   RNG, no real data — so this is bloat, not exposure. `examples/generated/` is
   build output in version control; consider gitignoring it and excluding it from
   the package.
-- **I-8 — `LAUNCH.md` (34 KB) was untracked and not in `.gitignore`.** A
-  `git add -A` before the first public push would sweep it into the public
+- **I-8 — `LAUNCH.md` (34 KB) was untracked and not in `.gitignore` *(FIXED)*.**
+  A `git add -A` before the first public push would sweep it into the public
   repository — and mid-review, commit `c3c19d5` did exactly that. It contains no
   credentials (checked), but it is clearly internal: remove it from the
-  repository and gitignore it before publishing.
+  repository and gitignore it before publishing. *(2026-09-29: done by
+  `52ff331`. `.gitignore:15-16` now covers `LAUNCH.md` and `make-demo.py`,
+  `git ls-files` does not know either file, and `git log main -- LAUNCH.md` is
+  empty — it is on no commit reachable from `main`. It does still exist on the
+  `backup-before-history-rewrite` branch, so that branch must never be pushed.)*
 - **I-9 — Supply-chain hardening left undone.** No `npm audit` step in CI and no
   `.github/dependabot.yml`, so today's clean audit does not stay clean. GitHub
   Actions are pinned by mutable tag (`actions/checkout@v4`), and
@@ -551,7 +728,12 @@ hatch, and add "run docpulse with a user holding only `read`" to the README.
   a workflow with `id-token: write`, plus 2FA and a granular automation token on
   the npm account. These were not applied: an `npm audit --audit-level=high` step
   can break CI on an unrelated upstream advisory, and pinning is the author's
-  trade-off to make.
+  trade-off to make. *(2026-09-29: **partially fixed** by `630a2ae`.
+  `.github/workflows/ci.yml` now runs `npm audit --audit-level=high`,
+  `.github/dependabot.yml` exists with weekly npm and github-actions updates, and
+  `examples/drift-check.yml` calls `npx docpulse@0.1.0` — an exact version, not
+  the floating `@0.1`. **Still open:** `actions/*` are pinned by mutable tag
+  rather than commit SHA, and there is no `npm publish --provenance` workflow.)*
 
 ---
 
@@ -716,18 +898,27 @@ Covered above: clean in the working tree, clean across all commits, no
 credential file ever tracked, `.gitignore` adequate, and the `--uri` trace
 proved clean end to end against a live authenticated mongod, including a real
 authentication failure. The one thing that *is* persisted is `sampling.filter`
-(L-4), and the one real exposure is argv (M-2).
+(L-4, still open by design). Argv exposure (M-2) was fixed after this review:
+`MONGODB_URI` and `--uri-file` both keep the string out of `argv`, and `--uri`
+survives only as an escape hatch its own help text argues against. Since
+`d698262`, `src/redact.ts` also rewrites `mongodb://user:pass@` to
+`mongodb://<redacted>@` in every string that reaches stderr, so the guarantee no
+longer depends on the driver redacting its own messages.
 
 ### 3. Input validation
 
 Path traversal: not applicable (above). Prototype pollution: clean, tested
 (above); the two related defects were dropped keys (L-1, L-2), both fixed.
-Unbounded memory: M-3 for `--input-json`, and L-3 for deeply nested filters
-(fixed); document recursion is capped at depth 24. ReDoS: all eight regexes
-verdicted safe. Shell / `eval` / Mongo JS: no shell and no `eval`; `--filter`
-does reach the driver unfiltered and `$where` executes server-side (L-5), which
-is the operator's own flag, not injection. Report escaping: H-1 and M-4, both
-fixed and regression-tested.
+Unbounded memory: M-3 for `--input-json` (**fixed since** — NDJSON streams,
+the array form is capped at 128 MiB), and L-3 for deeply nested filters (fixed);
+document recursion is capped at depth 24. ReDoS: all eight regexes verdicted
+safe (`src/redact.ts:7`, added since, is single-character classes only and was
+verdicted the same way). Shell / `eval` / Mongo JS: no shell and no `eval`;
+`--filter` reached the driver unfiltered and `$where` executed server-side
+(L-5) — **fixed since**: `$where`, `$function` and `$accumulator` are refused in
+`--filter` and `--sort` unless `--allow-server-js` is passed, which is the
+operator's own flag, not injection. Report escaping: H-1 and M-4, both fixed and
+regression-tested.
 
 ### 4. Dependency licences vs Apache-2.0
 
@@ -788,12 +979,14 @@ Proved with the tripwire run above. No project install scripts; the only
 `package-lock.json` is committed (69 KB, lockfile v3) and
 `.github/workflows/ci.yml` uses `npm ci`. Three runtime dependencies as
 promised, 14 packages in the full production tree, no unmet non-optional
-requirement. `npm pack --dry-run` now lists 93 files / 85.6 kB packed, ~482 kB
-unpacked, containing **no** `src/`, no `test/`, no `.env`, no `.github/`, no
-`PLAN.md` and no `LAUNCH.md` — the `files` allowlist works. `dist/cli.js` is
-chmod 755 with a correct shebang. Open items: I-6 (dangling source maps), I-7
-(example data and committed build output), I-8 (`LAUNCH.md` is now committed),
-I-9 (audit step, Dependabot, action pinning, provenance).
+requirement. `npm pack --dry-run` lists 98 files / 157.6 kB packed, 603.3 kB
+unpacked (re-measured 2026-09-29; the growth is `docs/demo.gif`), containing
+**no** `src/`, no `test/`, no `.env`, no `.github/`, no `PLAN.md` and no
+`LAUNCH.md` — the `files` allowlist works. `dist/cli.js` is chmod 755 with a
+correct shebang. Open items: I-6 (dangling source maps), I-7 (example data and
+committed build output). I-8 was fixed by `52ff331` and I-9 partially fixed by
+`630a2ae`; what remains of I-9 is SHA-pinning the actions and publish
+provenance.
 
 ---
 
@@ -822,7 +1015,13 @@ $ MONGODB_URI='mongodb://root:…@127.0.0.1:28018/?authSource=admin' npm run che
 
 The baseline before any change was **125 passed / 2 skipped**; the nine new
 tests are the regressions listed under H-1, M-1, M-4, L-1, L-2, L-3 and the path
-walker's `__proto__` case. `./examples/run.sh` still exits 0 and regenerates
+walker's `__proto__` case.
+
+*Re-run on 2026-09-29, after the six later commits:* `npm run check` is
+**185 passed / 2 skipped** (11 files passed, 1 skipped) with no database, and
+**187 passed** (12 files) with a throwaway `mongo:7` supplying `MONGODB_URI`.
+`npm run build`, `npm audit` (0 vulnerabilities) and `./examples/run.sh` are all
+green, and the example output is unchanged apart from `createdAt`. `./examples/run.sh` still exits 0 and regenerates
 `examples/generated/` byte-for-byte identically apart from `createdAt`, so the
 output pasted in the README is still accurate. The test container was removed
 after use.
