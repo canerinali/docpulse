@@ -1,6 +1,6 @@
 {
   "formatVersion": 1,
-  "tool": "docpulse@0.1.0",
+  "tool": "docpulse@0.1.1",
   "label": "prod-2026-09-19",
   "createdAt": "2026-09-19T02:15:04.881Z",
   "collection": "shop.orders",

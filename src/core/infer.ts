@@ -1,3 +1,4 @@
+import { VERSION } from '../version.js';
 import { walkDocument } from './paths.js';
 import type {
   Denominator,
@@ -10,7 +11,7 @@ import type {
 export const SNAPSHOT_FORMAT_VERSION = 1 as const;
 
 /** Identity string written into every snapshot's `tool` field. */
-export const TOOL_ID = 'docpulse@0.1.0';
+export const TOOL_ID = `docpulse@${VERSION}`;
 
 interface PathAccumulator {
   denominator: Denominator;

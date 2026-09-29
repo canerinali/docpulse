@@ -124,7 +124,7 @@ of its twelve entries:
 ```json
 {
   "formatVersion": 1,
-  "tool": "docpulse@0.1.0",
+  "tool": "docpulse@0.1.1",
   "label": "week-38",
   "createdAt": "2026-09-26T17:52:07.895Z",
   "collection": "shop.orders",

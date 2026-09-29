@@ -36,7 +36,7 @@ jobs:
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI_READONLY }}
         run: |
-          npx docpulse@0.1.0 snapshot \
+          npx docpulse@0.1.1 snapshot \
             --db shop \
             --collection orders \
             --sample-size 5000 \
@@ -45,7 +45,7 @@ jobs:
 
       - name: Fail if the schema drifted past the thresholds
         run: |
-          npx docpulse@0.1.0 diff \
+          npx docpulse@0.1.1 diff \
             contracts/orders.baseline.json \
             current.snapshot.json \
             --format markdown \

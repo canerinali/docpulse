@@ -1,3 +1,4 @@
+import { TOOL_ID } from '../core/infer.js';
 import type { DiffResult, Severity } from '../core/types.js';
 
 /**
@@ -9,7 +10,7 @@ export function renderJson(result: DiffResult): string {
   for (const f of result.findings) counts[f.severity] += 1;
 
   const payload = {
-    tool: 'docpulse@0.1.0',
+    tool: TOOL_ID,
     collection: result.baseline.collection,
     baseline: {
       label: result.baseline.label,

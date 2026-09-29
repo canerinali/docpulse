@@ -80,7 +80,7 @@ export interface FieldStat {
 /** A field-schema snapshot. This is the on-disk file format. */
 export interface Snapshot {
   formatVersion: 1;
-  /** e.g. `docpulse@0.1.0` */
+  /** e.g. `docpulse@0.1.1` */
   tool: string;
   /** Free-text label from `--label`, or `null`. */
   label: string | null;

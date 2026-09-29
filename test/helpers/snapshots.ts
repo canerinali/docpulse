@@ -1,3 +1,4 @@
+import { TOOL_ID } from '../../src/core/infer.js';
 import type { FieldStat, SamplingInfo, Snapshot } from '../../src/core/types.js';
 
 export const SORT_LIMIT: SamplingInfo = {
@@ -55,7 +56,7 @@ export interface SnapInput {
 export function snap(input: SnapInput): Snapshot {
   return {
     formatVersion: (input.formatVersion ?? 1) as 1,
-    tool: 'docpulse@0.1.0',
+    tool: TOOL_ID,
     label: input.label ?? null,
     createdAt: input.createdAt ?? '2026-09-26T00:00:00.000Z',
     collection: input.collection ?? 'shop.orders',

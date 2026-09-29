@@ -1,6 +1,6 @@
 {
   "name": "docpulse",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Data-contract testing for schemaless MongoDB collections: snapshot a collection's observed field schema and fail CI when it drifts past your thresholds.",
   "keywords": [
     "mongodb",
@@ -14,7 +14,7 @@
     "cli"
   ],
   "license": "Apache-2.0",
-  "author": "Caner İnali",
+  "author": "Caner \u0130nali",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/canerinali/docpulse.git"
@@ -42,7 +42,8 @@
     "docpulse.config.json",
     "README.md",
     "SECURITY.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=22"
