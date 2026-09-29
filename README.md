@@ -15,6 +15,8 @@ docpulse samples a MongoDB collection and writes down the schema your documents 
 are present in what share of the sample, which BSON types they take, how often they are null or empty. Then it
 diffs two of those snapshots and, under `--fail-on-drift`, exits nonzero when a drift crosses a threshold you set.
 
+![docpulse turning field drift into a failed build](docs/demo.gif)
+
 - **You find out the day a field stops being written, not the week a report comes out wrong.** An upstream
   service quietly drops `customer.taxId` from its payload. Nothing throws, nothing 500s, and the aggregation
   that reads it just returns fewer rows. docpulse turns that into a failed build on the next CI run.
